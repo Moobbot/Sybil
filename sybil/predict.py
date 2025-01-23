@@ -100,6 +100,7 @@ def predict(
     file_type: Literal["auto", "dicom", "png"] = "auto",
     threads: int = 0,
 ):
+    print("=== predict start ===")
     logger = logging_utils.get_logger()
 
     return_attentions |= write_attention_images
@@ -132,10 +133,12 @@ def predict(
     logger.debug(
         f"Beginning prediction using {num_files} {file_type} files from {image_dir}"
     )
+    print(f"Beginning prediction using {num_files} {file_type} files from {image_dir}")
 
+    print("Load model")
     # Load a trained model
     model = Sybil(model_name)
-
+    print("model loaded")
     # Get risk scores
     serie = Serie(input_files, voxel_spacing=voxel_spacing, file_type=file_type)
     series = [serie]
@@ -145,7 +148,7 @@ def predict(
     prediction_scores = prediction.scores[0]
 
     logger.debug(f"Prediction finished. Results:\n{prediction_scores}")
-
+    print("prediction_scores", prediction_scores)
     prediction_path = os.path.join(output_dir, "prediction_scores.json")
     pred_dict = {"predictions": prediction.scores}
     with open(prediction_path, "w") as f:
@@ -153,11 +156,13 @@ def predict(
 
     series_with_attention = None
     if return_attentions:
+        print("return_attentions")
         attention_path = os.path.join(output_dir, "attention_scores.pkl")
         with open(attention_path, "wb") as f:
             pickle.dump(prediction, f)
 
     if write_attention_images:
+        print("write_attention_images")
         series_with_attention = visualize_attentions(
             series,
             attentions=prediction.attentions,
@@ -185,9 +190,8 @@ def main():
     # )
 
     # print(json.dumps(pred_dict, indent=2))
-    
-    print("=== Predict main ===")
-    
+
+    print("===Predict main ===")
     image_dir = "D:/Work/Clients/Job/Sybil/custom/Chung_20241014"
     output_dir = "./visualizations"
     model_name = "sybil_ensemble"

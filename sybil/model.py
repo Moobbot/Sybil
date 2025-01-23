@@ -12,8 +12,11 @@ from sybil.serie import Serie
 from sybil.models.sybil import SybilNet
 from sybil.models.calibrator import SimpleClassifierGroup
 from sybil.utils.logging_utils import get_logger
-from sybil.utils.device_utils import get_default_device, get_most_free_gpu, get_device_mem_info
-
+from sybil.utils.device_utils import (
+    get_default_device,
+    get_most_free_gpu,
+    get_device_mem_info,
+)
 
 # Leaving this here for a bit; these are IDs to download the models from Google Drive
 NAME_TO_FILE = {
@@ -66,7 +69,10 @@ NAME_TO_FILE = {
     },
 }
 
-CHECKPOINT_URL = os.getenv("SYBIL_CHECKPOINT_URL", "https://github.com/reginabarzilaygroup/Sybil/releases/download/v1.5.0/sybil_checkpoints.zip")
+CHECKPOINT_URL = os.getenv(
+    "SYBIL_CHECKPOINT_URL",
+    "https://github.com/reginabarzilaygroup/Sybil/releases/download/v1.5.0/sybil_checkpoints.zip",
+)
 
 
 class Prediction(NamedTuple):
@@ -89,6 +95,7 @@ def download_sybil(name, cache) -> Tuple[List[str], str]:
 
     # Download models
     model_files = NAME_TO_FILE[name]
+    print("model_files:", model_files)
     checkpoints = model_files["checkpoint"]
     download_calib_path = os.path.join(cache, f"{name}_simple_calibrator.json")
     have_all_files = os.path.exists(download_calib_path)
@@ -157,6 +164,7 @@ class Sybil:
         """
         self._logger = get_logger()
         # Download if needed
+        print("name_or_path:", name_or_path)
         if isinstance(name_or_path, str) and (name_or_path in NAME_TO_FILE):
             name_or_path, calibrator_path = download_sybil(name_or_path, cache)
 
@@ -166,7 +174,7 @@ class Sybil:
                     [p for p in name_or_path if not os.path.exists(p)]
                 )
             )
-
+        print("calibrator_path:", calibrator_path)
         # Check calibrator path before continuing
         if (calibrator_path is not None) and (not os.path.exists(calibrator_path)):
             raise ValueError(f"Path not found for calibrator {calibrator_path}")
@@ -204,6 +212,7 @@ class Sybil:
         model
             Pretrained Sybil model
         """
+        print("Loading model from path:", path)
         # Load checkpoint
         checkpoint = torch.load(path, map_location="cpu")
         args = checkpoint["args"]
@@ -240,7 +249,9 @@ class Sybil:
         calibrated_scores = []
         for YEAR in range(scores.shape[1]):
             probs = scores[:, YEAR].reshape(-1, 1)
-            probs = self.calibrator["Year{}".format(YEAR + 1)].predict_proba(probs)[:, -1]
+            probs = self.calibrator["Year{}".format(YEAR + 1)].predict_proba(probs)[
+                :, -1
+            ]
             calibrated_scores.append(probs)
 
         return np.stack(calibrated_scores, axis=1)
@@ -296,16 +307,17 @@ class Sybil:
                             "volume_attention_1": out["volume_attention_1"]
                             .detach()
                             .cpu(),
-                            "hidden": out["hidden"]
-                            .detach()
-                            .cpu(),
+                            "hidden": out["hidden"].detach().cpu(),
                         }
                     )
 
         return Prediction(scores=scores, attentions=attentions)
 
     def predict(
-        self, series: Union[Serie, List[Serie]], return_attentions: bool = False, threads=0,
+        self,
+        series: Union[Serie, List[Serie]],
+        return_attentions: bool = False,
+        threads=0,
     ) -> Prediction:
         """Run predictions over the given serie(s) and ensemble
 
@@ -324,7 +336,7 @@ class Sybil:
             Output prediction. See details for :class:`~sybil.model.Prediction`".
 
         """
-
+        print("Predict called")
         # Set CPU threads available to torch
         num_threads = _torch_set_num_threads(threads)
         self._logger.debug(f"Using {num_threads} threads for PyTorch inference")
@@ -354,9 +366,9 @@ class Sybil:
             for i in range(len(series)):
                 att = {}
                 for key in attention_keys:
-                    att[key] = np.stack([
-                        attentions_[j][i][key] for j in range(len(self.ensemble))
-                    ])
+                    att[key] = np.stack(
+                        [attentions_[j][i][key] for j in range(len(self.ensemble))]
+                    )
                 attentions.append(att)
 
         return Prediction(scores=calib_scores, attentions=attentions)
@@ -380,6 +392,8 @@ class Sybil:
 
         """
         from sybil.utils.metrics import get_survival_metrics
+        print("Evaluate called")
+
         if isinstance(series, Serie):
             series = [series]
         elif not isinstance(series, list):
@@ -409,7 +423,9 @@ class Sybil:
         auc = [float(out[f"{i + 1}_year_auc"]) for i in range(self._max_followup)]
         c_index = float(out["c_index"])
 
-        return Evaluation(auc=auc, c_index=c_index, scores=scores, attentions=predictions.attentions)
+        return Evaluation(
+            auc=auc, c_index=c_index, scores=scores, attentions=predictions.attentions
+        )
 
     def to(self, device: str):
         """Move model to device.
@@ -419,6 +435,7 @@ class Sybil:
         device : str
             Device to move model to.
         """
+        print("Model moved to device:", device)
         self.device = device
         self.ensemble.to(device)
 
@@ -430,11 +447,14 @@ class Sybil:
 
         Motivation is to enable multiprocessing without the processes needed to communicate.
         """
+        print("Picking device")
         if not torch.cuda.is_available():
             return get_default_device()
 
         # Get size of the model in memory (approximate)
-        model_mem = 9*sum(p.numel() * p.element_size() for p in self.ensemble.parameters())
+        model_mem = 9 * sum(
+            p.numel() * p.element_size() for p in self.ensemble.parameters()
+        )
 
         # Check memory available on current device.
         # If it seems like we're the only thing on this GPU, stay.
