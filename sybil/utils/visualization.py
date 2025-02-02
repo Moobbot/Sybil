@@ -1,5 +1,6 @@
 import imageio
 import numpy as np
+import pydicom
 import torch
 import torch.nn.functional as F
 from sybil.serie import Serie
@@ -75,14 +76,23 @@ def visualize_attentions(
     print("=== visualize_attentions ===")
     if isinstance(series, Serie):
         series = [series]
+    if attentions is None or len(attentions) == 0:
+        raise ValueError(
+            "Attention data is empty. Ensure `return_attentions=True` when predicting."
+        )
 
     series_overlays = []
     for serie_idx, serie in enumerate(series):
         images = serie.get_raw_images()
         N = len(images)
-        cur_attention = collate_attentions(attentions[serie_idx], N)
 
+        if serie_idx >= len(attentions) or attentions[serie_idx] is None:
+            print(f"⚠️ Warning: Missing attention data for series {serie_idx}")
+            continue  # Bỏ qua nếu không có attention cho series này
+
+        cur_attention = collate_attentions(attentions[serie_idx], N)
         overlayed_images = build_overlayed_images(images, cur_attention, gain)
+
         print("save_directory: ", save_directory)
 
         if save_directory is not None:
@@ -147,3 +157,53 @@ def save_attention_images(
             overlay_path = os.path.join(save_path, f"slice_{idx}.png")
             print(f"Saving overlay image to: {overlay_path}")  # Debug
             imageio.imwrite(overlay_path, img)  # Lưu ảnh PNG
+
+
+def save_attention_images_dicom(
+    overlayed_images: List[np.ndarray],
+    cur_attention: np.ndarray,
+    save_path: str,
+    attention_threshold: float,
+    dicom_metadata=None,  # Dữ liệu metadata cho DICOM
+):
+    """
+    Lưu các ảnh overlay có attention vượt ngưỡng dưới dạng DICOM.
+
+    Args:
+        overlayed_images (List[np.ndarray]): Danh sách ảnh đã overlay attention.
+        cur_attention (np.ndarray): Attention values tương ứng với ảnh.
+        save_path (str): Đường dẫn để lưu ảnh.
+        attention_threshold (float): Ngưỡng attention để quyết định lưu ảnh.
+        dicom_metadata (pydicom.Dataset, optional): Metadata từ file DICOM gốc.
+
+    Returns:
+        None
+    """
+    os.makedirs(save_path, exist_ok=True)
+
+    for idx, (img, attention) in enumerate(zip(overlayed_images, cur_attention)):
+        if np.max(attention) > attention_threshold:
+            dicom_path = os.path.join(save_path, f"slice_{idx}.dcm")
+
+            # Tạo DICOM mới từ ảnh overlay
+            ds = pydicom.Dataset()
+
+            if dicom_metadata:
+                ds = dicom_metadata.copy()
+
+            # Thiết lập dữ liệu hình ảnh
+            ds.Rows, ds.Columns = img.shape
+            ds.PhotometricInterpretation = "MONOCHROME2"
+            ds.BitsAllocated = 16
+            ds.BitsStored = 16
+            ds.HighBit = 15
+            ds.SamplesPerPixel = 1
+            ds.PixelRepresentation = 0
+
+            # Chuyển ảnh sang uint16 để phù hợp với DICOM
+            img_uint16 = (img / np.max(img) * 65535).astype(np.uint16)
+            ds.PixelData = img_uint16.tobytes()
+
+            # Lưu ảnh DICOM
+            ds.save_as(dicom_path)
+            print(f"Saved DICOM overlay: {dicom_path}")
