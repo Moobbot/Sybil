@@ -5,7 +5,9 @@ import os
 import json
 import time
 import shutil
+import zipfile
 from flask import Flask, request, jsonify, send_file, send_from_directory
+import urllib
 from werkzeug.utils import secure_filename
 from typing import Literal
 from sybil.utils import logging_utils
@@ -30,42 +32,70 @@ app.config.update(UPLOAD_FOLDER=UPLOAD_FOLDER, RESULTS_FOLDER=RESULTS_FOLDER)
 
 from sybil import Sybil
 
+
+CHECKPOINT_URL = "https://github.com/reginabarzilaygroup/Sybil/releases/download/v1.5.0/sybil_checkpoints.zip"
+CHECKPOINT_DIR = "sybil_checkpoints"
+
 # Đường dẫn đến các checkpoint và calibrator
 model_paths = [
-    "sybil_checkpoints/28a7cd44f5bcd3e6cc760b65c7e0d54d.ckpt",
-    "sybil_checkpoints/56ce1a7d241dc342982f5466c4a9d7ef.ckpt",
-    "sybil_checkpoints/64a91b25f84141d32852e75a3aec7305.ckpt",
-    "sybil_checkpoints/65fd1f04cb4c5847d86a9ed8ba31ac1a.ckpt",
-    "sybil_checkpoints/624407ef8e3a2a009f9fa51f9846fe9a.ckpt",
+    os.path.join(CHECKPOINT_DIR, "28a7cd44f5bcd3e6cc760b65c7e0d54d.ckpt"),
+    os.path.join(CHECKPOINT_DIR, "56ce1a7d241dc342982f5466c4a9d7ef.ckpt"),
+    os.path.join(CHECKPOINT_DIR, "64a91b25f84141d32852e75a3aec7305.ckpt"),
+    os.path.join(CHECKPOINT_DIR, "65fd1f04cb4c5847d86a9ed8ba31ac1a.ckpt"),
+    os.path.join(CHECKPOINT_DIR, "624407ef8e3a2a009f9fa51f9846fe9a.ckpt"),
 ]
 
-calibrator_path = "sybil_checkpoints/sybil_ensemble_simple_calibrator.json"
+calibrator_path = os.path.join(CHECKPOINT_DIR, "sybil_ensemble_simple_calibrator.json")
 
 
-def load_model(name_or_path, calibrator_path):
+def download_checkpoints():
+    """Download and extract checkpoint if not exist."""
+    if not os.path.exists(CHECKPOINT_DIR):
+        os.makedirs(CHECKPOINT_DIR, exist_ok=True)
+
+        print(f"Downloading checkpoints from {CHECKPOINT_URL}...")
+        zip_path = os.path.join(CHECKPOINT_DIR, "sybil_checkpoints.zip")
+
+        urllib.request.urlretrieve(CHECKPOINT_URL, zip_path)
+
+        # Giải nén file
+        print("Extracting checkpoints...")
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall(CHECKPOINT_DIR)
+
+        os.remove(zip_path)  # Xóa file zip sau khi giải nén
+        print("Checkpoints downloaded and extracted successfully.")
+
+
+def load_model(name_or_path=None, calibrator=None):
     """
-    Load a trained model from a checkpoint or a directory of checkpoints.
+    Load a trained Sybil model from a checkpoint or a directory of checkpoints.
+    If there is no model or calibrator, download from CHECKPOINT_URL.
+
+    Args:
+        name_or_path (str | list): The path to the checkpoint file or the checkpoint file list.
+        calibrator (str): The path to the Calibrator file.
+
+    Returns:
+        Sybil: Model object has loaded.
     """
-    if isinstance(name_or_path, str) and os.path.isdir(name_or_path):
-        # Nếu chỉ truyền thư mục, lấy tất cả các file .ckpt trong thư mục
-        name_or_path = [
-            os.path.join(name_or_path, f)
-            for f in os.listdir(name_or_path)
-            if f.endswith(".ckpt")
-        ]
+    # Kiểm tra và tải checkpoints nếu cần
+    if name_or_path is None or not all(os.path.exists(p) for p in name_or_path):
+        print("Model checkpoints not found. Downloading...")
+        download_checkpoints()
+        name_or_path = model_paths  # Gán lại đường dẫn sau khi tải xuống
 
-    elif not all(os.path.exists(p) for p in name_or_path):
-        raise ValueError(
-            f"Model file not found: {[p for p in name_or_path if not os.path.exists(p)]}"
-        )
+    if calibrator is None or not os.path.exists(calibrator):
+        print("Calibrator file not found. Downloading...")
+        download_checkpoints()
+        calibrator = calibrator_path  # Gán lại đường dẫn sau khi tải xuống
 
-    # Khởi tạo Sybil bằng cách truyền vào đường dẫn trực tiếp
-    print("Load model")
-    model = Sybil(name_or_path=name_or_path, calibrator_path=calibrator_path)
+    # Load model từ checkpoint
+    print("Loading Sybil model...")
+    model = Sybil(name_or_path=name_or_path, calibrator_path=calibrator)
+    print("Model loaded successfully.")
+
     return model
-
-
-model = load_model(model_paths, calibrator_path)
 
 
 def predict(
@@ -170,6 +200,8 @@ def cleanup_old_results(expiry_time=3600):
 
 # Chạy dọn dẹp mỗi khi ứng dụng khởi động
 cleanup_old_results()
+
+model = load_model(model_paths, calibrator_path)
 
 
 @app.route("/api_predict", methods=["POST"])
