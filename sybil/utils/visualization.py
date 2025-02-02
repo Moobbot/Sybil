@@ -60,7 +60,6 @@ def visualize_attentions(
     save_directory: str = None,
     gain: int = 3,
     attention_threshold: float = 1e-3,  # Ngưỡng attention tối thiểu
-    # save_images_flag: bool = True  # Tùy chọn có lưu ảnh hay không
 ) -> List[List[np.ndarray]]:
     """
     Args:
