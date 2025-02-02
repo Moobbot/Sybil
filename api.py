@@ -90,6 +90,10 @@ def predict(
     voxel_spacing = None
     if file_type == "auto":
         extensions = {os.path.splitext(x)[1] for x in input_files}
+
+        if not extensions:
+            raise ValueError("No files with valid extensions found in the directory.")
+
         extension = extensions.pop()
         if len(extensions) > 1:
             raise ValueError(
@@ -178,11 +182,17 @@ def api_predict():
     if not files or all(file.filename == "" for file in files):
         return jsonify({"error": "No selected files"}), 400
 
+    # Tạo UUID cho mỗi yêu cầu dự đoán
+    session_id = str(uuid.uuid4())
+
     uploaded_files = []
     for file in files:
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
-            file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+            folder_file_path = os.path.join(app.config["UPLOAD_FOLDER"], session_id)
+            os.makedirs(folder_file_path, exist_ok=True)
+
+            file_path = os.path.join(folder_file_path, filename)
             file.save(file_path)
             uploaded_files.append(file_path)
             print("Uploaded file:", filename)
@@ -195,8 +205,6 @@ def api_predict():
     if not uploaded_files:
         return jsonify({"error": "No valid files uploaded"}), 400
 
-    # Tạo UUID cho mỗi yêu cầu dự đoán
-    session_id = str(uuid.uuid4())
     output_dir = os.path.join(app.config["RESULTS_FOLDER"], session_id)
     os.makedirs(output_dir, exist_ok=True)
 
@@ -204,7 +212,7 @@ def api_predict():
 
     # Chạy dự đoán với tất cả các file đã upload
     pred_dict, overlayed_images = predict(
-        app.config["UPLOAD_FOLDER"], output_dir, write_attention_images=True
+        folder_file_path, output_dir, write_attention_images=True
     )
 
     # Truy cập thư mục serie_0 để lấy ảnh overlay
