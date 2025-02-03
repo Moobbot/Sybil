@@ -151,7 +151,7 @@ def predict(
     output_dir,
     model_name="sybil_ensemble",
     return_attentions=True,
-    write_attention_images=False,
+    visualize_attentions_img=False,
     file_type: Literal["auto", "dicom", "png"] = "auto",
     threads: int = 0,
 ):
@@ -217,7 +217,7 @@ def predict(
         with open(attention_path, "wb") as f:
             pickle.dump(prediction, f)
 
-    if write_attention_images:
+    if visualize_attentions_img:
         series_with_attention = visualize_attentions(
             [serie], attentions=prediction.attentions, save_directory=output_dir, gain=3
         )
@@ -249,7 +249,7 @@ def api_predict():
 
     # Chạy dự đoán
     pred_dict, overlayed_images = predict(
-        upload_path, output_dir, write_attention_images=True
+        upload_path, output_dir, visualize_attentions_img=True
     )
 
     # Truy cập thư mục serie_0 để lấy ảnh overlay
