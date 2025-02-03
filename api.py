@@ -8,6 +8,7 @@ import uuid
 import urllib
 import pickle
 from flask import Flask, request, jsonify, send_file, send_from_directory
+import pydicom
 from werkzeug.utils import secure_filename
 from typing import Literal
 
@@ -152,6 +153,7 @@ def predict(
     model_name="sybil_ensemble",
     return_attentions=True,
     visualize_attentions_img=False,
+    save_as_dicom=False,  # Thêm lựa chọn lưu ảnh dưới dạng DICOM
     file_type: Literal["auto", "dicom", "png"] = "auto",
     threads: int = 0,
 ):
@@ -182,6 +184,7 @@ def predict(
         if file_type == "png":
             voxel_spacing = utils.VOXEL_SPACING
             logger.debug(f"Using default voxel spacing: {voxel_spacing}")
+
     logger.debug(f"Processing {len(input_files)} {file_type} files from {image_dir}")
 
     assert file_type in {"dicom", "png"}
@@ -197,7 +200,7 @@ def predict(
     # Load a trained model
     # model = Sybil(model_name)
     # print("model loaded")
-    # Get risk scores
+    # Tạo đối tượng Serie - Get risk scores
     serie = Serie(input_files, voxel_spacing=voxel_spacing, file_type=file_type)
     prediction = model.predict(
         [serie], return_attentions=return_attentions, threads=threads
@@ -206,6 +209,7 @@ def predict(
 
     logger.debug(f"Prediction finished. Results:\n{prediction_scores}")
 
+    # Lưu kết quả dự đoán
     prediction_path = os.path.join(output_dir, "prediction_scores.json")
     pred_dict = {"predictions": prediction.scores}
     with open(prediction_path, "w") as f:
@@ -217,9 +221,20 @@ def predict(
         with open(attention_path, "wb") as f:
             pickle.dump(prediction, f)
 
+    # Nếu chọn lưu ảnh DICOM, lấy metadata của từng ảnh
+    dicom_metadata_list = []
+    if save_as_dicom and file_type == "dicom":
+        dicom_metadata_list = [pydicom.dcmread(f) for f in input_files]
+
+    # Gọi visualize_attentions với danh sách metadata riêng
     if visualize_attentions_img:
         series_with_attention = visualize_attentions(
-            [serie], attentions=prediction.attentions, save_directory=output_dir, gain=3
+            [serie],
+            attentions=prediction.attentions,
+            save_directory=output_dir,
+            gain=3,
+            save_as_dicom=save_as_dicom,
+            dicom_metadata_list=dicom_metadata_list,  # Cập nhật danh sách metadata
         )
 
     return pred_dict, series_with_attention
@@ -249,7 +264,7 @@ def api_predict():
 
     # Chạy dự đoán
     pred_dict, overlayed_images = predict(
-        upload_path, output_dir, visualize_attentions_img=True
+        upload_path, output_dir, visualize_attentions_img=True, save_as_dicom=True
     )
 
     # Truy cập thư mục serie_0 để lấy ảnh overlay

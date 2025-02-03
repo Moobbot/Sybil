@@ -1,3 +1,4 @@
+import os
 import imageio
 import numpy as np
 import pydicom
@@ -5,52 +6,53 @@ import torch
 import torch.nn.functional as F
 from sybil.serie import Serie
 from typing import Dict, List, Union
-import os
 
 
 def collate_attentions(
     attention_dict: Dict[str, np.ndarray], N: int, eps=1e-6
 ) -> np.ndarray:
-    a1 = attention_dict["image_attention_1"]
-    v1 = attention_dict["volume_attention_1"]
+    """Tổng hợp attention từ mô hình."""
+    if not attention_dict:
+        raise ValueError(
+            "⚠️ Attention dictionary is empty. Ensure model returns valid attention maps."
+        )
 
-    a1 = torch.Tensor(a1)
-    v1 = torch.Tensor(v1)
+    a1 = torch.tensor(attention_dict.get("image_attention_1"), dtype=torch.float32)
+    v1 = torch.tensor(attention_dict.get("volume_attention_1"), dtype=torch.float32)
 
-    # take mean attention over ensemble
+    # Mean over ensemble
     a1 = torch.exp(a1).mean(0)
     v1 = torch.exp(v1).mean(0)
 
     attention = a1 * v1.unsqueeze(-1)
     attention = attention.view(1, 25, 16, 16)
 
-    attention_up = F.interpolate(
-        attention.unsqueeze(0), (N, 512, 512), mode="trilinear"
+    # Upscale attention map
+    attention_up = (
+        F.interpolate(attention.unsqueeze(0), (N, 512, 512), mode="trilinear")
+        .cpu()
+        .numpy()
+        .squeeze()
     )
-    attention_up = attention_up.cpu().numpy()
-    attention_up = attention_up.squeeze()
-    if eps:
-        attention_up[attention_up <= eps] = 0.0
+    attention_up[attention_up <= eps] = 0.0  # Apply threshold
 
     return attention_up
 
 
 def build_overlayed_images(
     images: List[np.ndarray], attention: np.ndarray, gain: int = 3
-):
+) -> List[np.ndarray]:
+    """Xây dựng ảnh overlay từ attention maps."""
     overlayed_images = []
-    N = len(images)
-    for i in range(N):
-        overlayed = np.zeros((512, 512, 3))
-        overlayed[..., 2] = images[i]
-        overlayed[..., 1] = images[i]
+    for img, att in zip(images, attention):
+        overlayed = np.zeros((512, 512, 3), dtype=np.uint8)
+        overlayed[..., 2] = img  # Channel Red
+        overlayed[..., 1] = img  # Channel Green
         overlayed[..., 0] = np.clip(
-            (attention[i, ...] * gain * 256) + images[i],
-            a_min=0,
-            a_max=255,
-        )
+            (att * gain * 256) + img, a_min=0, a_max=255
+        )  # Channel Blue
 
-        overlayed_images.append(np.uint8(overlayed))
+        overlayed_images.append(overlayed)
 
     return overlayed_images
 
@@ -60,25 +62,32 @@ def visualize_attentions(
     attentions: List[Dict[str, np.ndarray]],
     save_directory: str = None,
     gain: int = 3,
-    attention_threshold: float = 1e-3,  # Ngưỡng attention tối thiểu
+    attention_threshold: float = 1e-3,
+    save_as_dicom: bool = False,  # Lựa chọn lưu DICOM hoặc PNG
+    dicom_metadata_list: List[pydicom.Dataset] = None,  # Danh sách metadata DICOM
 ) -> List[List[np.ndarray]]:
     """
+    Tạo ảnh overlay từ attention và lưu vào thư mục.
     Args:
         series (Serie): series object
         attentions (Dict[str, np.ndarray]): attention dictionary output from model
         save_directory (str, optional): where to save the images. Defaults to None.
         gain (int, optional): how much to scale attention values by for visualization. Defaults to 3.
         attention_threshold (float, optional): Minimum attention value to consider saving an image. Defaults to 1e-3.
+        save_as_dicom (bool): Nếu True, lưu ảnh dưới dạng DICOM thay vì PNG.
+        dicom_metadata_list (List[pydicom.Dataset], optional): Danh sách metadata của từng ảnh DICOM.
 
     Returns:
         List[List[np.ndarray]]: list of list of overlayed images
     """
     print("=== visualize_attentions ===")
+
     if isinstance(series, Serie):
         series = [series]
-    if attentions is None or len(attentions) == 0:
+
+    if not attentions or len(attentions) == 0:
         raise ValueError(
-            "Attention data is empty. Ensure `return_attentions=True` when predicting."
+            "⚠️ Attention data is empty. Ensure `return_attentions=True` when predicting."
         )
 
     series_overlays = []
@@ -88,28 +97,33 @@ def visualize_attentions(
 
         if serie_idx >= len(attentions) or attentions[serie_idx] is None:
             print(f"⚠️ Warning: Missing attention data for series {serie_idx}")
-            continue  # Bỏ qua nếu không có attention cho series này
+            continue
 
         cur_attention = collate_attentions(attentions[serie_idx], N)
         overlayed_images = build_overlayed_images(images, cur_attention, gain)
 
-        print("save_directory: ", save_directory)
-
-        if save_directory is not None:
+        if save_directory:
             save_path = os.path.join(save_directory, f"serie_{serie_idx}")
+            os.makedirs(save_path, exist_ok=True)
 
-            # Lưu ảnh PNG chỉ khi attention vượt ngưỡng
-            save_attention_images(
-                overlayed_images,
-                cur_attention,
-                save_path,
-                attention_threshold,
-            )
+            # Kiểm tra lựa chọn lưu ảnh PNG hoặc DICOM
+            if save_as_dicom and dicom_metadata_list:
+                save_attention_images_dicom(
+                    overlayed_images,
+                    cur_attention,
+                    save_path,
+                    attention_threshold,
+                    dicom_metadata_list,
+                )
+            else:
+                save_attention_images(
+                    overlayed_images, cur_attention, save_path, attention_threshold
+                )
 
-            # Lưu toàn bộ ảnh dưới dạng GIF (nếu cần)
             save_images(overlayed_images, save_path, f"serie_{serie_idx}")
 
         series_overlays.append(overlayed_images)
+
     return series_overlays
 
 
@@ -125,12 +139,10 @@ def save_images(img_list: List[np.ndarray], directory: str, name: str):
     Returns:
         None
     """
-    import imageio
-
     os.makedirs(directory, exist_ok=True)
     path = os.path.join(directory, f"{name}.gif")
     imageio.mimsave(path, img_list)
-    print(f"GIF saved to: {directory}")
+    print(f"GIF saved to: {path}")
 
 
 def save_attention_images(
@@ -140,7 +152,7 @@ def save_attention_images(
     attention_threshold: float,
 ):
     """
-    Lưu các ảnh overlay có attention vượt ngưỡng.
+    Lưu ảnh overlay dạng PNG nếu attention vượt ngưỡng.
 
     Args:
         overlayed_images (List[np.ndarray]): Danh sách ảnh đã overlay attention.
@@ -155,8 +167,8 @@ def save_attention_images(
     for idx, (img, attention) in enumerate(zip(overlayed_images, cur_attention)):
         if np.max(attention) > attention_threshold:
             overlay_path = os.path.join(save_path, f"slice_{idx}.png")
-            print(f"Saving overlay image to: {overlay_path}")  # Debug
-            imageio.imwrite(overlay_path, img)  # Lưu ảnh PNG
+            imageio.imwrite(overlay_path, img)
+            print(f"Saved overlay PNG: {overlay_path}")
 
 
 def save_attention_images_dicom(
@@ -164,10 +176,10 @@ def save_attention_images_dicom(
     cur_attention: np.ndarray,
     save_path: str,
     attention_threshold: float,
-    dicom_metadata=None,  # Dữ liệu metadata cho DICOM
+    dicom_metadata_list: List[pydicom.Dataset],  # Danh sách metadata cho từng ảnh
 ):
     """
-    Lưu các ảnh overlay có attention vượt ngưỡng dưới dạng DICOM.
+    Lưu ảnh overlay có attention vượt ngưỡng dưới dạng DICOM.
 
     Args:
         overlayed_images (List[np.ndarray]): Danh sách ảnh đã overlay attention.
@@ -185,25 +197,26 @@ def save_attention_images_dicom(
         if np.max(attention) > attention_threshold:
             dicom_path = os.path.join(save_path, f"slice_{idx}.dcm")
 
-            # Tạo DICOM mới từ ảnh overlay
-            ds = pydicom.Dataset()
+            try:
+                # Lấy metadata tương ứng với ảnh hiện tại
+                ds = dicom_metadata_list[idx].copy()
 
-            if dicom_metadata:
-                ds = dicom_metadata.copy()
+                # Cấu hình ảnh DICOM
+                ds.Rows, ds.Columns = img.shape[:2]
+                ds.PhotometricInterpretation = "MONOCHROME2"
+                ds.BitsAllocated = 16
+                ds.BitsStored = 16
+                ds.HighBit = 15
+                ds.SamplesPerPixel = 1
+                ds.PixelRepresentation = 0
 
-            # Thiết lập dữ liệu hình ảnh
-            ds.Rows, ds.Columns = img.shape
-            ds.PhotometricInterpretation = "MONOCHROME2"
-            ds.BitsAllocated = 16
-            ds.BitsStored = 16
-            ds.HighBit = 15
-            ds.SamplesPerPixel = 1
-            ds.PixelRepresentation = 0
+                # Chuyển ảnh sang uint16 để phù hợp với DICOM
+                img_uint16 = (img / np.max(img) * 65535).astype(np.uint16)
+                ds.PixelData = img_uint16.tobytes()
 
-            # Chuyển ảnh sang uint16 để phù hợp với DICOM
-            img_uint16 = (img / np.max(img) * 65535).astype(np.uint16)
-            ds.PixelData = img_uint16.tobytes()
+                # Lưu ảnh DICOM
+                ds.save_as(dicom_path)
+                print(f"Saved DICOM overlay: {dicom_path}")
 
-            # Lưu ảnh DICOM
-            ds.save_as(dicom_path)
-            print(f"Saved DICOM overlay: {dicom_path}")
+            except Exception as e:
+                print(f"⚠️ Error saving DICOM slice {idx}: {str(e)}")
