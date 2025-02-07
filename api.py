@@ -3,10 +3,6 @@ import json
 import time
 import shutil
 import zipfile
-from flask import Flask, request, jsonify, send_file, send_from_directory
-import urllib
-from werkzeug.utils import secure_filename
-from typing import Literal
 import typing
 import zipfile
 import uuid
@@ -244,7 +240,7 @@ def predict(
 
     return pred_dict, series_with_attention
 
-model = load_model(model_paths, calibrator_path)
+model = load_model(MODEL_PATHS, calibrator_path)
 
 
 @app.route("/api_predict", methods=["POST"])
