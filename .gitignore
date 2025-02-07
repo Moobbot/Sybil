@@ -142,3 +142,7 @@ dmypy.json
 
 # Windows
 Thumbs.db
+
+sybil_checkpoints/*
+uploads/*
+results/*
