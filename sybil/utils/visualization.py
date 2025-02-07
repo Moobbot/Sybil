@@ -176,17 +176,17 @@ def save_attention_images_dicom(
     cur_attention: np.ndarray,
     save_path: str,
     attention_threshold: float,
-    dicom_metadata_list: List[pydicom.Dataset],  # Danh sách metadata cho từng ảnh
+    dicom_metadata_list: List[pydicom.Dataset],
 ):
     """
-    Lưu ảnh overlay có attention vượt ngưỡng dưới dạng DICOM.
+    Lưu ảnh overlay có attention vượt ngưỡng dưới dạng DICOM màu (RGB).
 
     Args:
         overlayed_images (List[np.ndarray]): Danh sách ảnh đã overlay attention.
         cur_attention (np.ndarray): Attention values tương ứng với ảnh.
         save_path (str): Đường dẫn để lưu ảnh.
         attention_threshold (float): Ngưỡng attention để quyết định lưu ảnh.
-        dicom_metadata (pydicom.Dataset, optional): Metadata từ file DICOM gốc.
+        dicom_metadata_list (List[pydicom.Dataset]): Danh sách metadata của từng ảnh DICOM.
 
     Returns:
         None
@@ -198,25 +198,36 @@ def save_attention_images_dicom(
             dicom_path = os.path.join(save_path, f"slice_{idx}.dcm")
 
             try:
-                # Lấy metadata tương ứng với ảnh hiện tại
+                # Lấy metadata từ ảnh gốc
                 ds = dicom_metadata_list[idx].copy()
 
-                # Cấu hình ảnh DICOM
-                ds.Rows, ds.Columns = img.shape[:2]
-                ds.PhotometricInterpretation = "MONOCHROME2"
-                ds.BitsAllocated = 16
-                ds.BitsStored = 16
-                ds.HighBit = 15
-                ds.SamplesPerPixel = 1
+                # Chuyển ảnh overlay thành RGB (nếu chưa đúng định dạng)
+                if img.shape[-1] != 3:
+                    raise ValueError(f"Ảnh overlay không phải RGB: {img.shape}")
+
+                # Chuyển đổi ảnh sang uint8 (0-255)
+                img_uint8 = np.clip(img, 0, 255).astype(np.uint8)
+
+                # Cấu hình metadata cho DICOM màu
+                ds.Rows, ds.Columns, ds.SamplesPerPixel = img_uint8.shape
+                ds.PhotometricInterpretation = "RGB"
+                ds.BitsAllocated = 8
+                ds.BitsStored = 8
+                ds.HighBit = 7
+                ds.PlanarConfiguration = 0  # Lưu ảnh theo thứ tự RGBRGB...
                 ds.PixelRepresentation = 0
 
-                # Chuyển ảnh sang uint16 để phù hợp với DICOM
-                img_uint16 = (img / np.max(img) * 65535).astype(np.uint16)
-                ds.PixelData = img_uint16.tobytes()
+                # Kiểm tra và sao chép các metadata quan trọng
+                for attr in ["PixelSpacing", "RescaleSlope", "RescaleIntercept"]:
+                    if hasattr(dicom_metadata_list[idx], attr):
+                        setattr(ds, attr, getattr(dicom_metadata_list[idx], attr))
+
+                # Gán ảnh vào PixelData
+                ds.PixelData = img_uint8.tobytes()
 
                 # Lưu ảnh DICOM
                 ds.save_as(dicom_path)
-                print(f"Saved DICOM overlay: {dicom_path}")
+                print(f"✅ Saved DICOM overlay (RGB): {dicom_path}")
 
             except Exception as e:
                 print(f"⚠️ Error saving DICOM slice {idx}: {str(e)}")
