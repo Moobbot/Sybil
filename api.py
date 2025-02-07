@@ -167,17 +167,17 @@ def predict(
     ]
 
     if not input_files:
-        raise ValueError("No valid files found in the directory.")
+        raise ValueError("⚠️ No valid files found in the directory.")
 
     voxel_spacing = None
     if file_type == "auto":
         extensions = {os.path.splitext(x)[1] for x in input_files}
         if not extensions:
-            raise ValueError("No files with valid extensions found.")
+            raise ValueError("⚠️ No files with valid extensions found.")
         extension = extensions.pop()
         if len(extensions) > 1:
             raise ValueError(
-                f"Multiple file types found in {image_dir}: {','.join(extensions)}"
+                f"⚠️ Multiple file types found in {image_dir}: {','.join(extensions)}"
             )
 
         file_type = "dicom" if extension.lower() not in {".png"} else "png"
