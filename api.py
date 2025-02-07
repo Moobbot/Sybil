@@ -240,9 +240,6 @@ def predict(
 
     return pred_dict, series_with_attention
 
-model = load_model(MODEL_PATHS, calibrator_path)
-
-
 @app.route("/api_predict", methods=["POST"])
 def api_predict():
     """API để nhận ảnh, chạy mô hình, và trả về dự đoán."""
