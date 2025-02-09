@@ -2,7 +2,6 @@ import os
 import json
 import time
 import shutil
-import zipfile
 import typing
 import zipfile
 import uuid
@@ -235,10 +234,26 @@ def predict(
             save_directory=output_dir,
             gain=3,
             save_as_dicom=save_as_dicom,
-            dicom_metadata_list=dicom_metadata_list,  # Cập nhật danh sách metadata
+            dicom_metadata_list=dicom_metadata_list,  # Update metadata
         )
 
     return pred_dict, series_with_attention
+
+
+def get_overlay_files(output_dir, session_id):
+    """Lấy danh sách ảnh overlay trong thư mục 'serie_0'."""
+    overlay_dir = os.path.join(output_dir, "serie_0")
+
+    if not os.path.exists(overlay_dir) or not os.listdir(overlay_dir):
+        print(f"⚠️ No overlay images found for session {session_id}")
+        return []
+
+    return [
+        img
+        for img in os.listdir(overlay_dir)
+        if os.path.isfile(os.path.join(overlay_dir, img))
+    ]
+
 
 @app.route("/api_predict", methods=["POST"])
 def api_predict():
@@ -302,40 +317,69 @@ def api_predict():
     return jsonify(response)
 
 
+def get_file_path(session_id, filename):
+    """Trả về đường dẫn đầy đủ của file trong thư mục kết quả."""
+    return os.path.join(RESULTS_FOLDER, session_id, "serie_0", filename)
+
+
 @app.route("/download/<session_id>/<filename>", methods=["GET"])
 def download_file(session_id, filename):
     """API để tải xuống ảnh overlay theo session ID."""
+    file_path = get_file_path(session_id, filename)
 
-    file_path = os.path.join(RESULTS_FOLDER, session_id, "serie_0", filename)
+    if os.path.exists(file_path):
+        print(f"✅ File found: {file_path}, preparing download...")
+        return send_file(file_path, as_attachment=True)
+
+    print(f"⚠️ File not found: {file_path}")
     return (
-        send_file(file_path, as_attachment=True)
-        if os.path.exists(file_path)
-        else jsonify({"error": "File not found"})
-    ), 404
+        jsonify(
+            {"error": "File not found", "session_id": session_id, "filename": filename}
+        ),
+        404,
+    )
 
 
 @app.route("/preview/<session_id>/<filename>", methods=["GET"])
 def preview_file(session_id, filename):
     """API để xem trước ảnh overlay."""
-
     overlay_dir = os.path.join(RESULTS_FOLDER, session_id, "serie_0")
+    file_path = os.path.join(overlay_dir, filename)
+
+    if os.path.exists(file_path):
+        print(f"✅ Previewing file: {file_path}")
+        return send_from_directory(overlay_dir, filename)
+
+    print(f"⚠️ Preview file not found: {file_path}")
     return (
-        send_from_directory(overlay_dir, filename)
-        if os.path.exists(os.path.join(overlay_dir, filename))
-        else jsonify({"error": "File not found"})
-    ), 404
+        jsonify(
+            {"error": "File not found", "session_id": session_id, "filename": filename}
+        ),
+        404,
+    )
 
 
 @app.route("/download_gif/<session_id>", methods=["GET"])
 def download_gif(session_id):
-    """API để tải xuống file GIF của ảnh overlay"""
+    """API để tải xuống file GIF của ảnh overlay."""
     gif_filename = "serie_0.gif"
-    gif_path = os.path.join(RESULTS_FOLDER, session_id, "serie_0", gif_filename)
-    print(f"Checking GIF path: {gif_path}")  # Debugging
+    gif_path = get_file_path(session_id, gif_filename)
 
     if os.path.exists(gif_path):
+        print(f"✅ GIF found: {gif_path}, preparing download...")
         return send_file(gif_path, as_attachment=True)
-    return jsonify({"error": "GIF file not found"}), 404
+
+    print(f"⚠️ GIF not found: {gif_path}")
+    return (
+        jsonify(
+            {
+                "error": "GIF file not found",
+                "session_id": session_id,
+                "filename": gif_filename,
+            }
+        ),
+        404,
+    )
 
 
 if __name__ == "__main__":
