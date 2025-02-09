@@ -282,26 +282,17 @@ def api_predict():
         upload_path, output_dir, visualize_attentions_img=True, save_as_dicom=True
     )
 
-    # Truy cập thư mục serie_0 để lấy ảnh overlay
-    overlay_dir = os.path.join(output_dir, "serie_0")
-    overlay_files = os.listdir(overlay_dir) if os.path.exists(overlay_dir) else []
-
-    # Nếu không có overlay images
-    if not overlay_files:
-        print("No overlay images found.")
-
-    # Tạo danh sách các URL tải xuống và xem trước ảnh
+    # Lấy danh sách file overlay
+    overlay_files = get_overlay_files(output_dir, session_id)
     base_url = request.host_url.rstrip("/")
-    overlay_image_info = []
-
-    for img in overlay_files:
-        overlay_image_info.append(
-            {
-                "filename": img,
-                "download_link": f"{base_url}/download/{session_id}/{img}",
-                "preview_link": f"{base_url}/preview/{session_id}/{img}",
-            }
-        )
+    overlay_image_info = [
+        {
+            "filename": img,
+            "download_link": f"{base_url}/download/{session_id}/{img}",
+            "preview_link": f"{base_url}/preview/{session_id}/{img}",
+        }
+        for img in overlay_files
+    ]
 
     # Trả về kết quả JSON bao gồm đường dẫn và attention values
     response = {
