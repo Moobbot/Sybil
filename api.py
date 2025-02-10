@@ -1,5 +1,6 @@
 import os
 import json
+import socket
 import time
 import shutil
 import typing
@@ -373,5 +374,21 @@ def download_gif(session_id):
     )
 
 
+def get_local_ip():
+    """Get the local IP address of the machine."""
+    try:
+        # Connect to an external host to get the local IP address
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0)
+        s.connect(("8.8.8.8", 1))  # Example using Google DNS
+        IP_CONNECT = s.getsockname()[0]
+        s.close()
+    except Exception:
+        IP_CONNECT = "127.0.0.1"
+    return IP_CONNECT
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
+    HOST_CONNECT = get_local_ip()
+    PORT_CONNECT = 5000
+    app.run(host= HOST_CONNECT, port=PORT_CONNECT, debug=True)
