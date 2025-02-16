@@ -3,25 +3,25 @@
 Python 3.10
 Pip version <=24.0
 
-## 1.
+## 1. Setup
 
 ```sh
-pip install -r requirements.txt
+python setup.py
 ```
 
 ## 2. API
 
 To use the API, follow these steps:
 
-1. Open a terminal or command prompt.
-2. Navigate to the directory containing the `api.py` file.
-3. Run the following command to start the API:
+  1. Open a terminal or command prompt.
+  2. Navigate to the directory containing the `api.py` file.
+  3. Run the following command to start the API:
 
-   ```sh
-   python api.py
-   ```
+```sh
+python api.py
+```
 
-4. The API will be accessible at `http://localhost:5000`.
+  4. The API will be accessible at `http://localhost:5000`.
 
 ### Endpoints
 

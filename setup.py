@@ -1,5 +1,6 @@
 import io
 import logging
+import platform
 import zipfile
 import os
 import subprocess
@@ -91,21 +92,70 @@ def download_and_extract_zip(url, extract_path="."):
         return False
 
 
+def check_gpu():
+    """
+    Kiểm tra xem máy có GPU hay không mà không cần PyTorch.
+    Hỗ trợ Windows, Linux và macOS.
+    """
+    try:
+        if platform.system() == "Windows":
+            output = subprocess.check_output(
+                ["wmic", "path", "win32_VideoController", "get", "name"],
+                universal_newlines=True,
+            )
+            gpus = [
+                line.strip()
+                for line in output.split("\n")
+                if line.strip() and "Name" not in line
+            ]
+        elif platform.system() == "Linux":
+            output = subprocess.check_output(["lspci"], universal_newlines=True)
+            gpus = [
+                line
+                for line in output.split("\n")
+                if "VGA" in line or "3D controller" in line
+            ]
+        elif platform.system() == "Darwin":  # macOS
+            output = subprocess.check_output(
+                ["system_profiler", "SPDisplaysDataType"], universal_newlines=True
+            )
+            gpus = [
+                line.strip() for line in output.split("\n") if "Chipset Model" in line
+            ]
+        else:
+            print("Không xác định được hệ điều hành.")
+            return None
+        return gpus if gpus else None
+    except Exception as e:
+        print(f"Lỗi khi kiểm tra GPU: {e}")
+        return None
+
+
 # torch==1.13.1
 # torchio==0.18.74
 # torchvision==0.14.1
 def install_packages():
-    print("Install Torch GPU")
+    print("Install Torch")
+    gpus = check_gpu()
     packages = ["torch", "torchvision", "torchaudio"]
-    subprocess.run(
-        [
-            "pip",
-            "install",
-            *packages,
-            "--index-url",
-            "https://download.pytorch.org/whl/cu121",
-        ]
-    )
+    if gpus:
+        print("GPU detected:")
+        for gpu in gpus:
+            print(f" - {gpu}")
+        print("Installing PyTorch with CUDA support...")
+        subprocess.run(
+            [
+                "pip",
+                "install",
+                *packages,
+                "--index-url",
+                "https://download.pytorch.org/whl/cu121",
+            ]
+        )
+    else:
+        print("No GPU detected, installing CPU version of PyTorch...")
+        subprocess.run(["pip", "install", "torch==1.13.1", "torchvision==0.18.74", "torchaudio==0.14.1"])
+
     print("Install requirements")
     subprocess.run(["pip", "install", "-r", "requirements.txt"])
 
@@ -113,6 +163,7 @@ def install_packages():
 def main():
     print("install_packages")
     install_packages()
+
 
 if __name__ == "__main__":
     main()
