@@ -1,22 +1,28 @@
-import os
+import base64
+import io
 import json
+import os
+import pickle
+import shutil
 import socket
 import time
-import shutil
 import typing
-import zipfile
 import uuid
 import urllib
-import pickle
-from flask import Flask, request, jsonify, send_file, send_from_directory
-import pydicom
-from werkzeug.utils import secure_filename
+import zipfile
+
 from typing import Literal
 
-from sybil.utils import logging_utils
+import numpy as np
+import pydicom
+from PIL import Image
+from flask import Flask, jsonify, request, send_file, send_from_directory
+from werkzeug.utils import secure_filename
+
 from sybil.datasets import utils
-from sybil.serie import Serie
 from sybil.model import Sybil
+from sybil.serie import Serie
+from sybil.utils import logging_utils
 from sybil.utils.visualization import visualize_attentions
 
 # CODE ĐỂ BIẾT CHƯƠNG TRINH CHAY TỪ a-b, CÁC THAM SỐ GỐC
@@ -256,6 +262,41 @@ def get_overlay_files(output_dir, session_id):
     ]
 
 
+def dicom_to_png(dicom_file):
+    """Chuyển đổi file DICOM thành ảnh PNG và trả về ảnh dạng base64"""
+    dicom_data = pydicom.dcmread(dicom_file)
+
+    # Kiểm tra loại ảnh
+    photometric_interpretation = dicom_data.PhotometricInterpretation
+    pixel_array = dicom_data.pixel_array.astype(np.float32)
+
+    # Chuẩn hóa giá trị pixel về khoảng 0-255
+    pixel_array = (
+        (pixel_array - np.min(pixel_array))
+        / (np.max(pixel_array) - np.min(pixel_array))
+        * 255
+    )
+    pixel_array = pixel_array.astype(np.uint8)
+
+    # Xử lý ảnh màu
+    if photometric_interpretation == "RGB":
+        image = Image.fromarray(pixel_array)
+    elif photometric_interpretation == "YBR_FULL":
+        image = Image.fromarray(pixel_array, mode="YCbCr").convert("RGB")
+    else:
+        image = Image.fromarray(pixel_array, mode="L")  # Ảnh grayscale
+
+    # Lưu ảnh vào bộ nhớ dưới dạng PNG
+    img_io = io.BytesIO()
+    image.save(img_io, format="PNG")
+    img_io.seek(0)
+
+    # Mã hóa ảnh PNG thành base64
+    img_base64 = base64.b64encode(img_io.getvalue()).decode("utf-8")
+
+    return img_base64
+
+
 @app.route("/api_predict", methods=["POST"])
 def api_predict():
     """API để nhận ảnh, chạy mô hình, và trả về dự đoán."""
@@ -372,6 +413,32 @@ def download_gif(session_id):
         ),
         404,
     )
+
+
+@app.route("/convert-list", methods=["POST"])
+def convert_dicom_list():
+    if "files" not in request.files:
+        return jsonify({"error": "No files uploaded"}), 400
+
+    files = request.files.getlist("files")
+
+    if not files:
+        return jsonify({"error": "Empty file list"}), 400
+
+    result = []
+    for file in files:
+        try:
+            img_base64 = dicom_to_png(file)
+            result.append(
+                {"filename": f"{file.filename}.png", "image_base64": img_base64}
+            )
+        except Exception as e:
+            return (
+                jsonify({"error": f"Error processing file {file.filename}: {str(e)}"}),
+                500,
+            )
+
+    return jsonify({"images": result})
 
 
 def get_local_ip():
