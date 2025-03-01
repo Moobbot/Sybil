@@ -137,7 +137,7 @@ def check_gpu():
 def install_packages():
     print("Install Torch")
     # gpus = check_gpu()
-    packages = ["torch<=1.13", "torchvision<=0.18", "torchaudio<=0.13"]
+    packages = ["torch<2.0.0", "torchvision<2.0.0", "torchaudio<2.0.0"]
     # Only use with Windows
     # if gpus:
     #     print("GPU detected:")
@@ -155,7 +155,6 @@ def install_packages():
     #     )
     # else:
     #     print("No GPU detected, installing CPU version of PyTorch...")
-    #     subprocess.run(["pip", "install", "torch==1.13.1", "torchvision==0.18.74", "torchaudio==0.14.1"])
     subprocess.run(["pip", "install", *packages])
 
     print("Install requirements")
