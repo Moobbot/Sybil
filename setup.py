@@ -136,7 +136,7 @@ def check_gpu():
 # torchvision==0.14.1
 def install_packages():
     print("Install Torch")
-    gpus = check_gpu()
+    # gpus = check_gpu()
     packages = ["torch<2.0.0", "torchvision<2.0.0", "torchaudio<2.0.0"]
     # Only use with Windows
     # if gpus:
