@@ -2,6 +2,9 @@ FROM python:3.10
 
 WORKDIR /app
 
+# Cài đặt các thư viện hệ thống cần thiết
+RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
+
 # Tạo và sử dụng virtual environment
 ENV VIRTUAL_ENV=/opt/venv
 RUN python3 -m venv $VIRTUAL_ENV
@@ -15,11 +18,6 @@ COPY . .
 # Cài đặt dependencies từ setup.py
 RUN python setup.py
 
-# Cài đặt các thư viện hệ thống cần thiết
-RUN apt-get update && apt-get install -y \
-    libgl1 \
-    libglib2.0-0 \
-    && rm -rf /var/lib/apt/lists/*
 
 EXPOSE 5000
 
