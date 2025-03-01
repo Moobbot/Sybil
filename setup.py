@@ -155,8 +155,8 @@ def install_packages():
     #     )
     # else:
     #     print("No GPU detected, installing CPU version of PyTorch...")
-    #     subprocess.run(["pip", "install", "torch==1.13.1", "torchvision==0.18.74", "torchaudio==0.14.1"])
-    subprocess.run(["pip", "install", *packages])
+    subprocess.run(["pip", "install", "torch<2.0.0", "torchvision<2.0.0", "torchaudio<2.0.0"])
+    # subprocess.run(["pip", "install", *packages])
 
     print("Install requirements")
     subprocess.run(["pip", "install", "-r", "requirements.txt"])
