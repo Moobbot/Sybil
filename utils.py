@@ -4,6 +4,8 @@ import os
 import time
 import shutil
 import socket
+import zipfile
+from flask import jsonify
 import numpy as np
 import pydicom
 from PIL import Image
@@ -122,3 +124,57 @@ def get_local_ip():
     except:
         ip_address = "127.0.0.1"
     return ip_address
+
+
+def save_uploaded_zip(file, session_id, folder_save=UPLOAD_FOLDER):
+    """Lưu file ZIP tải lên"""
+    zip_path = os.path.join(folder_save, f"{session_id}.zip")
+    file.save(zip_path)
+    return zip_path
+
+
+def extract_zip_file(zip_path, session_id, folder_save=UPLOAD_FOLDER):
+    """Giải nén ZIP, kiểm tra thư mục con"""
+    unzip_path = os.path.join(folder_save, session_id)
+    os.makedirs(unzip_path, exist_ok=True)
+    print("unzip_path:", unzip_path)
+
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall(unzip_path)
+    except zipfile.BadZipFile:
+        os.remove(zip_path)
+        return None, jsonify({"error": "Invalid ZIP file"}), 400
+
+    os.remove(zip_path)
+
+    # Nếu ZIP chỉ có 1 thư mục con, cập nhật lại đường dẫn
+    subfolders = [
+        f for f in os.listdir(unzip_path) if os.path.isdir(os.path.join(unzip_path, f))
+    ]
+    if len(subfolders) == 1:
+        unzip_path = os.path.join(unzip_path, subfolders[0])
+
+    return unzip_path, None, None
+
+
+def get_valid_files(unzip_path):
+    """Lấy danh sách file hợp lệ (DICOM/PNG)"""
+    valid_files = []
+    for root, _, files in os.walk(unzip_path):
+        for filename in files:
+            if filename.lower().endswith((".dcm", ".png")):
+                valid_files.append(os.path.join(root, filename))
+    return valid_files
+
+
+def create_zip_result(output_dir, session_id, folder_save=RESULTS_FOLDER):
+    """Nén ảnh dự đoán thành file ZIP"""
+    result_zip_path = os.path.join(folder_save, f"{session_id}.zip")
+    with zipfile.ZipFile(result_zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for root, _, files in os.walk(output_dir):
+            for file in files:
+                file_path = os.path.join(root, file)
+                arcname = os.path.relpath(file_path, output_dir)
+                zipf.write(file_path, arcname)
+    return result_zip_path

@@ -5,7 +5,16 @@ import shutil
 from flask import Blueprint, request, jsonify, send_file, send_from_directory
 from config import RESULTS_FOLDER, UPLOAD_FOLDER
 from call_model import load_model, predict
-from utils import dicom_to_png, get_overlay_files, save_uploaded_files, get_file_path
+from utils import (
+    create_zip_result,
+    dicom_to_png,
+    extract_zip_file,
+    get_overlay_files,
+    get_valid_files,
+    save_uploaded_files,
+    get_file_path,
+    save_uploaded_zip,
+)
 
 bp = Blueprint("routes", __name__)
 
@@ -24,44 +33,24 @@ def api_predict():
 
     if not file.filename.endswith(".zip"):
         return jsonify({"error": "Invalid file format. Only ZIP is allowed."}), 400
-    print(file)
+
+    print("File upload:", file)
+
     # Tạo UUID cho mỗi yêu cầu dự đoán
     session_id = str(uuid.uuid4())
 
     # Lưu file ZIP tải lên
-    zip_path = os.path.join(UPLOAD_FOLDER, f"{session_id}.zip")
-    file.save(zip_path)
-
-    # Thư mục để giải nén file ZIP
-    unzip_path = os.path.join(UPLOAD_FOLDER, session_id)
-    print("unzip_path:", unzip_path)
-    os.makedirs(unzip_path, exist_ok=True)
-
-    # Thư mục để giải nén file ZIP
-    unzip_path = os.path.join(UPLOAD_FOLDER, session_id)
-    os.makedirs(unzip_path, exist_ok=True)
+    zip_path = save_uploaded_zip(file, session_id, folder_save=UPLOAD_FOLDER)
 
     # Giải nén file ZIP
-    try:
-        with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            zip_ref.extractall(unzip_path)
-    except zipfile.BadZipFile:
-        return jsonify({"error": "Invalid ZIP file"}), 400
+    unzip_path, error_response, status_code = extract_zip_file(
+        zip_path, session_id, folder_save=UPLOAD_FOLDER
+    )
+    if error_response:
+        return error_response, status_code
 
-    # Xóa file ZIP sau khi giải nén
-    os.remove(zip_path)
-
-    # Kiểm tra nếu ZIP giải nén tạo ra một thư mục con duy nhất
-    subfolders = [f for f in os.listdir(unzip_path) if os.path.isdir(os.path.join(unzip_path, f))]
-    if len(subfolders) == 1:
-        unzip_path = os.path.join(unzip_path, subfolders[0])  # Cập nhật lại đường dẫn ảnh
-
-    # Kiểm tra xem có file hợp lệ không
-    valid_files = []
-    for root, _, files in os.walk(unzip_path):
-        for filename in files:
-            if filename.lower().endswith((".dcm", ".png")):
-                valid_files.append(os.path.join(root, filename))
+    # Kiểm tra xem có file hợp lệ
+    valid_files = get_valid_files(unzip_path)
 
     if not valid_files:
         shutil.rmtree(unzip_path)  # Xóa thư mục trống
@@ -77,14 +66,11 @@ def api_predict():
         unzip_path, output_dir, model, visualize_attentions_img=True, save_as_dicom=True
     )
 
-    # Tạo file ZIP chứa ảnh kết quả
-    result_zip_path = os.path.join(RESULTS_FOLDER, f"{session_id}.zip")
-    with zipfile.ZipFile(result_zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for root, _, files in os.walk(output_dir):
-            for file in files:
-                file_path = os.path.join(root, file)
-                arcname = os.path.relpath(file_path, output_dir)
-                zipf.write(file_path, arcname)
+    overlay_images_link = os.path.join(output_dir, "serie_0")
+    # Nén kết quả dự đoán
+    result_zip_path = create_zip_result(
+        overlay_images_link, session_id, folder_save=RESULTS_FOLDER
+    )
 
     # Xóa thư mục trung gian
     shutil.rmtree(unzip_path)
@@ -189,9 +175,7 @@ def download_zip(session_id):
 
     print(f"⚠️ File not found: {file_path}")
     return (
-        jsonify(
-            {"error": "File not found", "session_id": session_id}
-        ),
+        jsonify({"error": "File not found", "session_id": session_id}),
         404,
     )
 
