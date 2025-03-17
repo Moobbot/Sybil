@@ -6,7 +6,6 @@ import torch
 import torch.nn.functional as F
 from sybil.serie import Serie
 from typing import Dict, List, Union
-import logging
 
 
 def collate_attentions(
@@ -41,19 +40,33 @@ def collate_attentions(
 
 
 def build_overlayed_images(
-    images: List[np.ndarray], attention: np.ndarray, gain: int = 3
+    images: List[np.ndarray],
+    attention: np.ndarray,
+    gain: int = 3,
+    brightness_factor: float = 1.3,  # Add brightness adjustment factor
 ) -> List[np.ndarray]:
-    """Xây dựng ảnh overlay từ attention maps."""
+    """Xây dựng ảnh overlay từ attention maps với điều chỉnh độ sáng."""
     overlayed_images = []
     for img, att in zip(images, attention):
+        # Normalize and apply brightness adjustment to original image
+        if img.max() > 0:  # Avoid division by zero
+            norm_img = img.astype(np.float32)
+            # Apply brightness adjustment
+            brightened_img = np.clip(norm_img * brightness_factor, 0, 255).astype(
+                np.uint8
+            )
+        else:
+            brightened_img = img.astype(np.uint8)
+
+        # Create the overlay with improved brightness
         overlayed = np.zeros((512, 512, 3), dtype=np.uint8)
-        overlayed[..., 2] = img  # Channel Red
-        overlayed[..., 1] = img  # Channel Green
+        overlayed[..., 2] = brightened_img  # Channel Red
+        overlayed[..., 1] = brightened_img  # Channel Green
         overlayed[..., 0] = np.clip(
-            (att * gain * 256) + img, a_min=0, a_max=255
+            (att * gain * 256) + brightened_img, a_min=0, a_max=255
         ).astype(
             np.uint8
-        )  # Channel Blue
+        )  # Channel Blue with attention
 
         overlayed_images.append(overlayed)
 
@@ -112,48 +125,35 @@ def save_attention_images_dicom(
     dicom_metadata_list: List[pydicom.Dataset],
 ):
     """
-    Saves overlayed attention images as DICOM with RGB encoding, ensuring metadata is
-    properly set for CornerstoneJS visualization.
-
-    Parameters:
-    - overlayed_images: List of NumPy arrays representing the overlayed images.
-    - cur_attention: List of NumPy arrays containing attention maps.
-    - save_path: Path to save the generated DICOM files.
-    - attention_threshold: Minimum threshold to determine if the attention map should be saved.
-    - dicom_metadata_list: List of pydicom.Dataset objects containing original DICOM metadata.
+    Lưu ảnh overlay có attention vượt ngưỡng dưới dạng DICOM màu (RGB)
+    với điều chỉnh metadata để hiển thị tốt hơn trên cornerstonejs.
     """
     os.makedirs(save_path, exist_ok=True)
-
-    if len(dicom_metadata_list) != len(overlayed_images):
-        logging.warning(
-            "Mismatch: Number of DICOM metadata does not match the number of images!"
-        )
 
     for idx, (img, attention) in enumerate(zip(overlayed_images, cur_attention)):
         if np.max(attention) > attention_threshold:
             dicom_path = os.path.join(save_path, f"slice_{idx}.dcm")
 
-            if idx >= len(dicom_metadata_list):
-                logging.warning(
-                    f"Skipping slice {idx}: No corresponding DICOM metadata found."
-                )
-                continue
             try:
                 # Lấy metadata từ ảnh gốc
                 ds = dicom_metadata_list[idx].copy()
 
-                # Convert image to uint8 (0-255)
+                # Chuyển đổi ảnh sang uint8 (0-255)
                 img_uint8 = np.clip(img, 0, 255).astype(np.uint8)
 
-                # Configure metadata for RGB DICOM
+                # Cấu hình metadata cho DICOM màu
                 ds.Rows, ds.Columns = img_uint8.shape[:2]
                 ds.SamplesPerPixel = 3
                 ds.PhotometricInterpretation = "RGB"
                 ds.BitsAllocated = 8
                 ds.BitsStored = 8
                 ds.HighBit = 7
-                ds.PlanarConfiguration = 0  # RGB contiguous
+                ds.PlanarConfiguration = 0  # Lưu ảnh theo thứ tự RGBRGB...
                 ds.PixelRepresentation = 0
+
+                # # Set window/level for better display in viewers
+                # ds.WindowCenter = 127
+                # ds.WindowWidth = 255
 
                 # Make sure rescale values are set properly
                 ds.RescaleIntercept = 0
@@ -178,11 +178,9 @@ def save_attention_images_dicom(
 
                 # Lưu ảnh DICOM
                 ds.save_as(dicom_path)
-                logging.info(f"✅ Successfully saved DICOM overlay: {dicom_path}")
                 print(f"✅ Saved DICOM overlay (RGB): {dicom_path}")
 
             except Exception as e:
-                logging.error(f"⚠️ Error saving DICOM slice {idx}: {str(e)}")
                 print(f"⚠️ Error saving DICOM slice {idx}: {str(e)}")
 
 
@@ -196,19 +194,18 @@ def visualize_attentions(
     dicom_metadata_list: List[pydicom.Dataset] = None,  # Danh sách metadata DICOM
 ) -> List[List[np.ndarray]]:
     """
-    Generates overlayed attention images and saves them as PNG or DICOM.
-
+    Tạo ảnh overlay từ attention và lưu vào thư mục.
     Args:
-        series (Union[Serie, List[Serie]]): The series object(s) containing images.
-        attentions (List[Dict[str, np.ndarray]]): A list of attention maps per series.
-        save_directory (Optional[str]): Directory to save the images. Defaults to None.
-        gain (int): Factor to scale attention values for visualization. Defaults to 3.
-        attention_threshold (float): Minimum attention value to consider saving an image.
-        save_as_dicom (bool): If True, saves images as DICOM instead of PNG.
-        dicom_metadata_list (Optional[List[pydicom.Dataset]]): Metadata list for DICOM images.
+        series (Serie): series object
+        attentions (Dict[str, np.ndarray]): attention dictionary output from model
+        save_directory (str, optional): where to save the images. Defaults to None.
+        gain (int, optional): how much to scale attention values by for visualization. Defaults to 3.
+        attention_threshold (float, optional): Minimum attention value to consider saving an image. Defaults to 1e-3.
+        save_as_dicom (bool): Nếu True, lưu ảnh dưới dạng DICOM thay vì PNG.
+        dicom_metadata_list (List[pydicom.Dataset], optional): Danh sách metadata của từng ảnh DICOM.
 
     Returns:
-        List[List[np.ndarray]]: List of overlayed image lists per series.
+        List[List[np.ndarray]]: list of list of overlayed images
     """
     print("=== visualize_attentions ===")
 
@@ -216,10 +213,9 @@ def visualize_attentions(
         series = [series]
 
     if not attentions or len(attentions) == 0:
-        raise ValueError("⚠️ Attention data is empty. Ensure `return_attentions=True` when predicting.")
-
-    if dicom_metadata_list and len(dicom_metadata_list) < len(series):
-        logging.warning("⚠️ DICOM metadata list is shorter than the number of series. Some images may be missing metadata.")
+        raise ValueError(
+            "⚠️ Attention data is empty. Ensure `return_attentions=True` when predicting."
+        )
 
     series_overlays = []
     for serie_idx, serie in enumerate(series):
@@ -228,7 +224,6 @@ def visualize_attentions(
 
         if serie_idx >= len(attentions) or attentions[serie_idx] is None:
             print(f"⚠️ Warning: Missing attention data for series {serie_idx}")
-            logging.warning(f"⚠️ Missing attention data for series {serie_idx}. Skipping.")
             continue
 
         cur_attention = collate_attentions(attentions[serie_idx], N)
@@ -238,6 +233,7 @@ def visualize_attentions(
             save_path = os.path.join(save_directory, f"serie_{serie_idx}")
             os.makedirs(save_path, exist_ok=True)
 
+            # Kiểm tra lựa chọn lưu ảnh PNG hoặc DICOM
             if save_as_dicom and dicom_metadata_list:
                 save_attention_images_dicom(
                     overlayed_images,
