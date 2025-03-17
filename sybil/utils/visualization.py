@@ -57,76 +57,6 @@ def build_overlayed_images(
     return overlayed_images
 
 
-def visualize_attentions(
-    series: Union[Serie, List[Serie]],
-    attentions: List[Dict[str, np.ndarray]],
-    save_directory: str = None,
-    gain: int = 3,
-    attention_threshold: float = 1e-3,
-    save_as_dicom: bool = False,  # Lựa chọn lưu DICOM hoặc PNG
-    dicom_metadata_list: List[pydicom.Dataset] = None,  # Danh sách metadata DICOM
-) -> List[List[np.ndarray]]:
-    """
-    Tạo ảnh overlay từ attention và lưu vào thư mục.
-    Args:
-        series (Serie): series object
-        attentions (Dict[str, np.ndarray]): attention dictionary output from model
-        save_directory (str, optional): where to save the images. Defaults to None.
-        gain (int, optional): how much to scale attention values by for visualization. Defaults to 3.
-        attention_threshold (float, optional): Minimum attention value to consider saving an image. Defaults to 1e-3.
-        save_as_dicom (bool): Nếu True, lưu ảnh dưới dạng DICOM thay vì PNG.
-        dicom_metadata_list (List[pydicom.Dataset], optional): Danh sách metadata của từng ảnh DICOM.
-
-    Returns:
-        List[List[np.ndarray]]: list of list of overlayed images
-    """
-    print("=== visualize_attentions ===")
-
-    if isinstance(series, Serie):
-        series = [series]
-
-    if not attentions or len(attentions) == 0:
-        raise ValueError(
-            "⚠️ Attention data is empty. Ensure `return_attentions=True` when predicting."
-        )
-
-    series_overlays = []
-    for serie_idx, serie in enumerate(series):
-        images = serie.get_raw_images()
-        N = len(images)
-
-        if serie_idx >= len(attentions) or attentions[serie_idx] is None:
-            print(f"⚠️ Warning: Missing attention data for series {serie_idx}")
-            continue
-
-        cur_attention = collate_attentions(attentions[serie_idx], N)
-        overlayed_images = build_overlayed_images(images, cur_attention, gain)
-
-        if save_directory:
-            save_path = os.path.join(save_directory, f"serie_{serie_idx}")
-            os.makedirs(save_path, exist_ok=True)
-
-            # Kiểm tra lựa chọn lưu ảnh PNG hoặc DICOM
-            if save_as_dicom and dicom_metadata_list:
-                save_attention_images_dicom(
-                    overlayed_images,
-                    cur_attention,
-                    save_path,
-                    attention_threshold,
-                    dicom_metadata_list,
-                )
-            else:
-                save_attention_images(
-                    overlayed_images, cur_attention, save_path, attention_threshold
-                )
-
-            save_images(overlayed_images, save_path, f"serie_{serie_idx}")
-
-        series_overlays.append(overlayed_images)
-
-    return series_overlays
-
-
 def save_images(img_list: List[np.ndarray], directory: str, name: str):
     """
     Saves a list of images as a GIF in the specified directory with the given name.
@@ -231,3 +161,73 @@ def save_attention_images_dicom(
 
             except Exception as e:
                 print(f"⚠️ Error saving DICOM slice {idx}: {str(e)}")
+
+
+def visualize_attentions(
+    series: Union[Serie, List[Serie]],
+    attentions: List[Dict[str, np.ndarray]],
+    save_directory: str = None,
+    gain: int = 3,
+    attention_threshold: float = 1e-3,
+    save_as_dicom: bool = False,  # Lựa chọn lưu DICOM hoặc PNG
+    dicom_metadata_list: List[pydicom.Dataset] = None,  # Danh sách metadata DICOM
+) -> List[List[np.ndarray]]:
+    """
+    Tạo ảnh overlay từ attention và lưu vào thư mục.
+    Args:
+        series (Serie): series object
+        attentions (Dict[str, np.ndarray]): attention dictionary output from model
+        save_directory (str, optional): where to save the images. Defaults to None.
+        gain (int, optional): how much to scale attention values by for visualization. Defaults to 3.
+        attention_threshold (float, optional): Minimum attention value to consider saving an image. Defaults to 1e-3.
+        save_as_dicom (bool): Nếu True, lưu ảnh dưới dạng DICOM thay vì PNG.
+        dicom_metadata_list (List[pydicom.Dataset], optional): Danh sách metadata của từng ảnh DICOM.
+
+    Returns:
+        List[List[np.ndarray]]: list of list of overlayed images
+    """
+    print("=== visualize_attentions ===")
+
+    if isinstance(series, Serie):
+        series = [series]
+
+    if not attentions or len(attentions) == 0:
+        raise ValueError(
+            "⚠️ Attention data is empty. Ensure `return_attentions=True` when predicting."
+        )
+
+    series_overlays = []
+    for serie_idx, serie in enumerate(series):
+        images = serie.get_raw_images()
+        N = len(images)
+
+        if serie_idx >= len(attentions) or attentions[serie_idx] is None:
+            print(f"⚠️ Warning: Missing attention data for series {serie_idx}")
+            continue
+
+        cur_attention = collate_attentions(attentions[serie_idx], N)
+        overlayed_images = build_overlayed_images(images, cur_attention, gain)
+
+        if save_directory:
+            save_path = os.path.join(save_directory, f"serie_{serie_idx}")
+            os.makedirs(save_path, exist_ok=True)
+
+            # Kiểm tra lựa chọn lưu ảnh PNG hoặc DICOM
+            if save_as_dicom and dicom_metadata_list:
+                save_attention_images_dicom(
+                    overlayed_images,
+                    cur_attention,
+                    save_path,
+                    attention_threshold,
+                    dicom_metadata_list,
+                )
+            else:
+                save_attention_images(
+                    overlayed_images, cur_attention, save_path, attention_threshold
+                )
+
+            save_images(overlayed_images, save_path, f"serie_{serie_idx}")
+
+        series_overlays.append(overlayed_images)
+
+    return series_overlays
