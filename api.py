@@ -13,7 +13,7 @@ if __name__ == "__main__":
     HOST_CONNECT = (
         "0.0.0.0"  # Chạy trên tất cả các IP, bao gồm cả localhost và IP cục bộ
     )
-    PORT_CONNECT = 5000
+    PORT_CONNECT = 5555
     print(f"Running on: http://127.0.0.1:{PORT_CONNECT} (localhost)")
     print(f"Running on: http://{LOCAL_IP}:{PORT_CONNECT} (local network)")
 
