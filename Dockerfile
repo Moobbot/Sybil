@@ -19,6 +19,6 @@ COPY . .
 RUN python setup.py
 
 
-EXPOSE 5000
+EXPOSE 5555
 
 CMD ["python", "api.py"]
