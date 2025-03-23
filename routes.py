@@ -23,7 +23,15 @@ model = load_model()
 
 @bp.route("/api_predict", methods=["POST"])
 def api_predict():
-    """API để nhận file ZIP, giải nén, chạy mô hình, và trả về file ZIP kết quả"""
+    """
+    API to receive ZIP file, unzip, run the model, and return the ZIP result
+
+    Args:
+        file (FileStorage): The ZIP file to be uploaded
+
+    Returns:
+        JSON: The prediction results including the ZIP download link and attention information
+    """
 
     print("API predict_zip called")
     file = request.files.get("file")
@@ -36,54 +44,55 @@ def api_predict():
 
     print("File upload:", file)
 
-    # Tạo UUID cho mỗi yêu cầu dự đoán
+    # Create a UUID for each prediction request
     session_id = str(uuid.uuid4())
 
-    # Lưu file ZIP tải lên
+    # Save the uploaded ZIP file
     zip_path = save_uploaded_zip(file, session_id, folder_save=UPLOAD_FOLDER)
 
-    # Giải nén file ZIP
+    # Unzip the ZIP file
     unzip_path, error_response, status_code = extract_zip_file(
         zip_path, session_id, folder_save=UPLOAD_FOLDER
     )
     if error_response:
         return error_response, status_code
 
-    # Kiểm tra xem có file hợp lệ
+    # Check if there are valid files
     valid_files = get_valid_files(unzip_path)
 
     if not valid_files:
-        shutil.rmtree(unzip_path)  # Xóa thư mục trống
+        shutil.rmtree(unzip_path)  # Delete the empty directory
         return jsonify({"error": "No valid files found in the ZIP archive"}), 400
 
-    # Thư mục để lưu kết quả dự đoán
+    # The directory to save the prediction results
     output_dir = os.path.join(RESULTS_FOLDER, session_id)
     os.makedirs(output_dir, exist_ok=True)
     print(f"Session ID: {session_id}, Output directory: {output_dir}")
 
-    # Chạy dự đoán
-    pred_dict, _ = predict(
+    # Run prediction
+    pred_dict, _, attention_info = predict(
         unzip_path, output_dir, model, visualize_attentions_img=True, save_as_dicom=True
     )
 
     overlay_images_link = os.path.join(output_dir, "serie_0")
-    # Nén kết quả dự đoán
+    # Zip the prediction results
     result_zip_path = create_zip_result(
         overlay_images_link, session_id, folder_save=RESULTS_FOLDER
     )
 
-    # Xóa thư mục trung gian
+    # Delete the intermediate directory
     shutil.rmtree(unzip_path)
     shutil.rmtree(output_dir)
 
     base_url = request.host_url.rstrip("/")
     zip_download_link = f"{base_url}/download_zip/{session_id}"
 
-    # Trả về kết quả JSON bao gồm link tải file ZIP
+    # Return the JSON result including the ZIP download link and attention information
     response = {
         "session_id": session_id,
         "predictions": pred_dict["predictions"],
         "overlay_images": zip_download_link,
+        "attention_info": attention_info,
         "message": "Prediction successful.",
     }
 
@@ -92,18 +101,24 @@ def api_predict():
 
 @bp.route("/api_predict_v1", methods=["POST"])
 def api_predict_v1():
-    """API to receive photos, run the model, and return the prediction"""
+    """API to receive photos, run the model, and return the prediction
 
+    Args:
+        file (FileStorage): The photos to be uploaded
+
+    Returns:
+        JSON: The prediction results including the path and attention values
+    """
     print("API predict called")
     files = request.files.getlist("file")
 
     if not files or all(file.filename == "" for file in files):
         return jsonify({"error": "No selected files"}), 400
 
-    # Tạo UUID cho mỗi yêu cầu dự đoán
+    # Create a UUID for each prediction request
     session_id = str(uuid.uuid4())
 
-    # Lưu file & lấy danh sách tệp đã tải lên
+    # Save the files & get the list of uploaded files
     uploaded_files, upload_path = save_uploaded_files(files, session_id)
     if not uploaded_files:
         return jsonify({"error": "No valid files uploaded"}), 400
@@ -112,8 +127,8 @@ def api_predict_v1():
     os.makedirs(output_dir, exist_ok=True)
     print(f"Session ID: {session_id}, Output directory: {output_dir}")
 
-    # Chạy dự đoán
-    pred_dict, overlayed_images = predict(
+    # Run prediction
+    pred_dict, overlayed_images, attention_info = predict(
         upload_path,
         output_dir,
         model,
@@ -121,23 +136,24 @@ def api_predict_v1():
         save_as_dicom=True,
     )
 
-    # Lấy danh sách file overlay
+    # Get the list of overlay files
     overlay_files = get_overlay_files(output_dir, session_id)
     base_url = request.host_url.rstrip("/")
     overlay_image_info = [
         {
             "filename": img,
-            "download_link": f"{base_url}/download/{session_id}/{img}",
-            "preview_link": f"{base_url}/preview/{session_id}/{img}",
+            # "download_link": f"{base_url}/download/{session_id}/{img}",
+            # "preview_link": f"{base_url}/preview/{session_id}/{img}",
         }
         for img in overlay_files
     ]
 
-    # Trả về kết quả JSON bao gồm đường dẫn và attention values
+    # Return the JSON result including the path and attention values
     response = {
         "session_id": session_id,
         "predictions": pred_dict["predictions"],
         "overlay_images": overlay_image_info,
+        "attention_info": attention_info,
         "gif_download": (
             f"{base_url}/download_gif/{session_id}" if overlay_files else None
         ),
