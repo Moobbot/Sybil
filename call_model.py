@@ -4,6 +4,7 @@ import typing
 import urllib
 import zipfile
 import json
+from flask import logging
 import numpy as np
 
 import pydicom
@@ -167,8 +168,10 @@ def predict(
 
     # If you choose to save dicom photos, take the metadata of each photo
     dicom_metadata_list = []
-    if save_as_dicom and file_type == "dicom":
+    if (save_as_dicom or visualize_attentions_img) and file_type == "dicom":
         dicom_metadata_list = [pydicom.dcmread(f) for f in input_files]
+        if not dicom_metadata_list:
+            logging.warning("⚠️ No DICOM metadata could be loaded from input files")
 
     # Call Visualize_attentions with its own Metadata list
     if visualize_attentions_img:
