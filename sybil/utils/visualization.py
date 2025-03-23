@@ -131,28 +131,29 @@ def save_attention_images(
         if np.mean(attention) > attention_threshold:
             # Get patient name from DICOM metadata if available
             patient_name = ""
-            if dicom_metadata_list and i < len(dicom_metadata_list):
-                try:
-                    # Get patient name from DICOM metadata
-                    if hasattr(dicom_metadata_list[i], "PatientName"):
-                        patient_name = str(dicom_metadata_list[i].PatientName)
-                    # Remove diacritics and special characters
-                    patient_name = remove_diacritics(patient_name)
-                    # Replace spaces with underscores and remove special characters
-                    patient_name = "".join(
-                        e for e in patient_name if e.isalnum() or e == " "
-                    )
-                    patient_name = patient_name.replace(" ", "_")
-                except:
-                    patient_name = f"Unknown_Patient"
+            # if dicom_metadata_list and i < len(dicom_metadata_list):
+            #     try:
+            #         # Get patient name from DICOM metadata
+            #         if hasattr(dicom_metadata_list[i], "PatientName"):
+            #             patient_name = str(dicom_metadata_list[i].PatientName)
+            #         # Remove diacritics and special characters
+            #         patient_name = remove_diacritics(patient_name)
+            #         # Replace spaces with underscores and remove special characters
+            #         patient_name = "".join(
+            #             e for e in patient_name if e.isalnum() or e == " "
+            #         )
+            #         patient_name = patient_name.replace(" ", "_")
+            #     except:
+            #         patient_name = f"Unknown_Patient"
 
-            if not patient_name:
-                # Fallback to original filename if no patient name
-                patient_name = (
-                    os.path.splitext(os.path.basename(input_files[i]))[0]
-                    if input_files
-                    else f"Image"
-                )
+            if input_files:
+                # Get the base filename without extension
+                base_name = os.path.splitext(os.path.basename(input_files[i]))[0]
+                # Remove any numbers at the end of the filename
+                base_name = ''.join(c for c in base_name if not c.isdigit())
+                patient_name = base_name.strip('_')  # Remove trailing underscores
+            else:
+                patient_name = f"Unknown_Patient"
 
             # Create filename with patient name and zero-padded number, using (N-1)-i to reverse the order
             base_filename = f"pred_{patient_name}_{(N-1)-i:0{num_digits}d}"
