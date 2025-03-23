@@ -152,7 +152,8 @@ def predict(
         attention_info = {
             "attention_scores": [
                 {
-                    "file_name": os.path.basename(input_files[i]),
+                    "file_name_original": os.path.basename(input_files[i]),
+                    "file_name_pred": f"pred_{os.path.basename(input_files[i])}",
                     "rank": item["rank"],
                     "attention_score": item["attention_score"],
                     # ,"max_attention": float(np.max(item["attention_map"])),
