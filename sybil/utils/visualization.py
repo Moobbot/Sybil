@@ -82,23 +82,31 @@ def save_attention_images(
     cur_attention: np.ndarray,
     save_path: str,
     attention_threshold: float,
+    input_files: List[str] = None,
 ):
     """
-    Lưu ảnh overlay dạng PNG nếu attention vượt ngưỡng.
+    Saves overlayed attention images as PNG files.
 
-    Args:
-        overlayed_images (List[np.ndarray]): Danh sách ảnh đã overlay attention.
-        cur_attention (np.ndarray): Attention values tương ứng với ảnh.
-        save_path (str): Đường dẫn để lưu ảnh.
-        attention_threshold (float): Ngưỡng attention để quyết định lưu ảnh.
-
-    Returns:
-        None
+    Parameters:
+    - overlayed_images: List of NumPy arrays representing the overlayed images.
+    - cur_attention: List of NumPy arrays containing attention maps.
+    - save_path: Path to save the generated PNG files.
+    - attention_threshold: Minimum threshold to determine if the attention map should be saved.
+    - input_files: List of original input file paths to get original filenames.
     """
     os.makedirs(save_path, exist_ok=True)
+
     for idx, (img, attention) in enumerate(zip(overlayed_images, cur_attention)):
-        if np.max(attention) > attention_threshold:
-            overlay_path = os.path.join(save_path, f"slice_{idx}.png")
+        if np.mean(attention) > attention_threshold:
+            # Get original filename if available, otherwise use index
+            if input_files and idx < len(input_files):
+                original_filename = os.path.basename(input_files[idx])
+                # Remove extension and add pred_ prefix
+                filename = f"pred_{os.path.splitext(original_filename)[0]}.png"
+            else:
+                filename = f"pred_{idx}.png"
+                
+            overlay_path = os.path.join(save_path, filename)
             imageio.imwrite(overlay_path, img)
             print(f"Saved overlay PNG: {overlay_path}")
 
@@ -109,6 +117,7 @@ def save_attention_images_dicom(
     save_path: str,
     attention_threshold: float,
     dicom_metadata_list: List[pydicom.Dataset],
+    input_files: List[str] = None,
 ):
     """
     Saves overlayed attention images as DICOM with RGB encoding, ensuring metadata is
@@ -120,6 +129,7 @@ def save_attention_images_dicom(
     - save_path: Path to save the generated DICOM files.
     - attention_threshold: Minimum threshold to determine if the attention map should be saved.
     - dicom_metadata_list: List of pydicom.Dataset objects containing original DICOM metadata.
+    - input_files: List of original input file paths to get original filenames.
     """
     os.makedirs(save_path, exist_ok=True)
 
@@ -129,8 +139,16 @@ def save_attention_images_dicom(
         )
 
     for idx, (img, attention) in enumerate(zip(overlayed_images, cur_attention)):
-        if np.max(attention) > attention_threshold:
-            dicom_path = os.path.join(save_path, f"slice_{idx}.dcm")
+        if np.mean(attention) > attention_threshold:
+            # Get original filename if available, otherwise use index
+            if input_files and idx < len(input_files):
+                original_filename = os.path.basename(input_files[idx])
+                # Remove extension and add pred_ prefix
+                filename = f"pred_{os.path.splitext(original_filename)[0]}.dcm"
+            else:
+                filename = f"pred_{idx}.dcm"
+                
+            dicom_path = os.path.join(save_path, filename)
 
             if idx >= len(dicom_metadata_list):
                 logging.warning(
@@ -191,8 +209,9 @@ def visualize_attentions(
     save_directory: str = None,
     gain: int = 3,
     attention_threshold: float = 1e-3,
-    save_as_dicom: bool = False,  # Lựa chọn lưu DICOM hoặc PNG
-    dicom_metadata_list: List[pydicom.Dataset] = None,  # Danh sách metadata DICOM
+    save_as_dicom: bool = False,
+    dicom_metadata_list: List[pydicom.Dataset] = None,
+    input_files: List[str] = None,
 ) -> List[List[np.ndarray]]:
     """
     Generates overlayed attention images and saves them as PNG or DICOM.
@@ -205,6 +224,7 @@ def visualize_attentions(
         attention_threshold (float): Minimum attention value to consider saving an image.
         save_as_dicom (bool): If True, saves images as DICOM instead of PNG.
         dicom_metadata_list (Optional[List[pydicom.Dataset]]): Metadata list for DICOM images.
+        input_files (Optional[List[str]]): List of original input file paths.
 
     Returns:
         List[List[np.ndarray]]: List of overlayed image lists per series.
@@ -250,10 +270,15 @@ def visualize_attentions(
                     save_path,
                     attention_threshold,
                     dicom_metadata_list,
+                    input_files
                 )
             else:
                 save_attention_images(
-                    overlayed_images, cur_attention, save_path, attention_threshold
+                    overlayed_images, 
+                    cur_attention, 
+                    save_path, 
+                    attention_threshold,
+                    input_files
                 )
 
             save_images(overlayed_images, save_path, f"serie_{serie_idx}")
@@ -267,7 +292,7 @@ def rank_images_by_attention(
     attention_dict: Dict[str, np.ndarray],
     images: List[np.ndarray],
     N: int,
-    eps: float = 1e-6,
+    eps: float = 1e-3,
 ) -> List[Dict[str, Union[int, float, np.ndarray]]]:
     """
     Rank images based on the predicted attention score.
