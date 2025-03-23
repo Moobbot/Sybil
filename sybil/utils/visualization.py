@@ -131,27 +131,16 @@ def save_attention_images(
         if np.mean(attention) > attention_threshold:
             # Get patient name from DICOM metadata if available
             patient_name = ""
-            # if dicom_metadata_list and i < len(dicom_metadata_list):
-            #     try:
-            #         # Get patient name from DICOM metadata
-            #         if hasattr(dicom_metadata_list[i], "PatientName"):
-            #             patient_name = str(dicom_metadata_list[i].PatientName)
-            #         # Remove diacritics and special characters
-            #         patient_name = remove_diacritics(patient_name)
-            #         # Replace spaces with underscores and remove special characters
-            #         patient_name = "".join(
-            #             e for e in patient_name if e.isalnum() or e == " "
-            #         )
-            #         patient_name = patient_name.replace(" ", "_")
-            #     except:
-            #         patient_name = f"Unknown_Patient"
 
             if input_files:
                 # Get the base filename without extension
                 base_name = os.path.splitext(os.path.basename(input_files[i]))[0]
-                # Remove any numbers at the end of the filename
-                base_name = ''.join(c for c in base_name if not c.isdigit())
-                patient_name = base_name.strip('_')  # Remove trailing underscores
+                # Split by underscore and remove the last part if it's a number
+                parts = base_name.split('_')
+                if parts and parts[-1].isdigit():
+                    patient_name = '_'.join(parts[:-1])
+                else:
+                    patient_name = base_name
             else:
                 patient_name = f"Unknown_Patient"
 

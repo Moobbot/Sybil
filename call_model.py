@@ -154,12 +154,30 @@ def predict(
             len(serie.get_raw_images()),
         )
 
+        def get_patient_name(file_name):
+            # Get the base filename without extension
+            base_name = os.path.splitext(os.path.basename(file_name))[0]
+            parts = base_name.split("_")
+            if parts and parts[-1].isdigit():
+                # Return the last number and the rest of the name separately
+                return "_".join(parts[:-1]), parts[-1]
+            else:
+                return base_name, ""
+
+        # Calculate number of digits needed for zero padding
+        N = len(ranked_images)
+        num_digits = len(str(N))
+
         # Create detailed attention information with only 3 parameters
         attention_info = {
             "attention_scores": [
                 {
                     "file_name_original": os.path.basename(input_files[i]),
-                    "file_name_pred": f"pred_{os.path.basename(input_files[i])}",
+                    "file_name_pred": (
+                        f"pred_{get_patient_name(input_files[i])[0]}_{int(get_patient_name(input_files[i])[1]):0{num_digits}d}.dcm"
+                        if get_patient_name(input_files[i])[1]
+                        else f"pred_{get_patient_name(input_files[i])[0]}_{(N-1)-i:0{num_digits}d}.dcm"
+                    ),
                     "rank": item["rank"],
                     "attention_score": item["attention_score"],
                 }
@@ -182,7 +200,7 @@ def predict(
             gain=3,
             save_as_dicom=save_as_dicom,
             dicom_metadata_list=dicom_metadata_list,
-            input_files=input_files
+            input_files=input_files,
         )
 
     return pred_dict, series_with_attention, attention_info
