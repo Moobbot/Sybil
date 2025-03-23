@@ -93,6 +93,13 @@ def save_gif(img_list: List[np.ndarray], directory: str, name: str):
     print(f"GIF saved to: {path}")
 
 
+def remove_diacritics(text):
+    """Remove diacritics from Vietnamese text"""
+    import unicodedata
+    text = unicodedata.normalize('NFKD', text)
+    return u"".join([c for c in text if not unicodedata.combining(c)])
+
+
 def save_attention_images(
     overlayed_images: List[np.ndarray],
     cur_attention: np.ndarray,
@@ -104,57 +111,61 @@ def save_attention_images(
 ):
     """
     Saves overlayed attention images as PNG or DICOM files.
-
-    Parameters:
-    - overlayed_images: List of NumPy arrays representing the overlayed images.
-    - cur_attention: List of NumPy arrays containing attention maps.
-    - save_path: Path to save the generated files.
-    - attention_threshold: Minimum threshold to determine if the attention map should be saved.
-    - save_as_dicom: If True, saves as DICOM format, otherwise saves as PNG.
-    - dicom_metadata_list: List of pydicom.Dataset objects containing original DICOM metadata (required if save_as_dicom is True).
-    - input_files: List of original input file paths to get original filenames.
     """
     os.makedirs(save_path, exist_ok=True)
 
-    # Validate DICOM metadata requirements upfront
-    if save_as_dicom:
-        if dicom_metadata_list is None:
-            raise ValueError(
-                "dicom_metadata_list is required when saving as DICOM format"
-            )
-        if len(dicom_metadata_list) != len(overlayed_images):
-            logging.warning(
-                "Mismatch: Number of DICOM metadata does not match the number of images!"
-            )
+    if save_as_dicom and dicom_metadata_list is None:
+        raise ValueError("dicom_metadata_list is required when saving as DICOM format")
 
-    for idx, (img, attention) in enumerate(zip(overlayed_images, cur_attention)):
+    # Create a list of indices in correct order (0 to N-1)
+    N = len(overlayed_images)
+    indices = list(range(N))
+    
+    # Calculate number of digits needed for zero padding
+    num_digits = len(str(N))
+
+    # Process images in correct order
+    for i in indices:
+        attention = cur_attention[i]
         if np.mean(attention) > attention_threshold:
-            # Get original filename if available, otherwise use index
-            if input_files and idx < len(input_files):
-                original_filename = os.path.basename(input_files[idx])
-                # Remove extension and add pred_ prefix
-                base_filename = f"pred_{os.path.splitext(original_filename)[0]}"
-            else:
-                base_filename = f"pred_{idx}"
+            # Get patient name from DICOM metadata if available
+            patient_name = ""
+            if dicom_metadata_list and i < len(dicom_metadata_list):
+                try:
+                    # Get patient name from DICOM metadata
+                    if hasattr(dicom_metadata_list[i], 'PatientName'):
+                        patient_name = str(dicom_metadata_list[i].PatientName)
+                    # Remove diacritics and special characters
+                    patient_name = remove_diacritics(patient_name)
+                    # Replace spaces with underscores and remove special characters
+                    patient_name = ''.join(e for e in patient_name if e.isalnum() or e == ' ')
+                    patient_name = patient_name.replace(' ', '_')
+                except:
+                    patient_name = f"Unknown_Patient"
+            
+            if not patient_name:
+                # Fallback to original filename if no patient name
+                patient_name = os.path.splitext(os.path.basename(input_files[i]))[0] if input_files else f"Image"
+            
+            # Create filename with patient name and zero-padded number, using (N-1)-i to reverse the order
+            base_filename = f"pred_{patient_name}_{(N-1)-i:0{num_digits}d}"
 
             if not save_as_dicom:
                 # Save as PNG
                 png_path = os.path.join(save_path, f"{base_filename}.png")
-                imageio.imwrite(png_path, img)
+                imageio.imwrite(png_path, overlayed_images[i])
                 print(f"Saved overlay PNG: {png_path}")
             else:
-                if idx >= len(dicom_metadata_list):
-                    logging.warning(
-                        f"Skipping slice {idx}: No corresponding DICOM metadata found."
-                    )
+                if i >= len(dicom_metadata_list):
+                    logging.warning(f"Skipping slice {i}: No corresponding DICOM metadata found.")
                     continue
 
                 try:
                     # Get metadata from original image
-                    ds = dicom_metadata_list[idx].copy()
+                    ds = dicom_metadata_list[i].copy()
 
                     # Convert image to uint8 (0-255)
-                    img_uint8 = np.clip(img, 0, 255).astype(np.uint8)
+                    img_uint8 = np.clip(overlayed_images[i], 0, 255).astype(np.uint8)
 
                     # Configure metadata for RGB DICOM
                     ds.Rows, ds.Columns = img_uint8.shape[:2]
@@ -163,14 +174,10 @@ def save_attention_images(
                     ds.BitsAllocated = 8
                     ds.BitsStored = 8
                     ds.HighBit = 7
-                    ds.PlanarConfiguration = 0  # RGB contiguous
+                    ds.PlanarConfiguration = 0
                     ds.PixelRepresentation = 0
-
-                    # Make sure rescale values are set properly
                     ds.RescaleIntercept = 0
                     ds.RescaleSlope = 1
-
-                    # Set VOI LUT function to LINEAR for proper scaling
                     ds.VOILUTFunction = "LINEAR"
 
                     # Copy important metadata
@@ -181,10 +188,9 @@ def save_attention_images(
                         "ImageOrientationPatient",
                         "InstanceNumber",
                     ]:
-                        if hasattr(dicom_metadata_list[idx], attr):
-                            setattr(ds, attr, getattr(dicom_metadata_list[idx], attr))
+                        if hasattr(dicom_metadata_list[i], attr):
+                            setattr(ds, attr, getattr(dicom_metadata_list[i], attr))
 
-                    # Assign image to PixelData
                     ds.PixelData = img_uint8.tobytes()
 
                     # Save DICOM image
@@ -194,8 +200,8 @@ def save_attention_images(
                     print(f"✅ Saved DICOM overlay (RGB): {dicom_path}")
 
                 except Exception as e:
-                    logging.error(f"⚠️ Error saving DICOM slice {idx}: {str(e)}")
-                    print(f"⚠️ Error saving DICOM slice {idx}: {str(e)}")
+                    logging.error(f"⚠️ Error saving DICOM slice {i}: {str(e)}")
+                    print(f"⚠️ Error saving DICOM slice {i}: {str(e)}")
 
 
 def visualize_attentions(
@@ -259,7 +265,6 @@ def visualize_attentions(
             save_path = os.path.join(save_directory, f"serie_{serie_idx}")
             os.makedirs(save_path, exist_ok=True)
 
-            # Save images in the correct order
             save_attention_images(
                 overlayed_images,
                 cur_attention,
@@ -312,11 +317,7 @@ def rank_images_by_attention(
     # Sort by score in descending order
     ranked_indices = sorted(attention_scores, key=lambda x: x[1], reverse=True)
 
-    # Create a list of dictionaries with the following keys:
-    # - rank: The rank of the image
-    # - attention_score: The attention score of the image
-    # - image: The image
-    # - attention_map: The attention map of the image
+    # Create a list of dictionaries with ranking info
     ranked_images = []
     for rank, (idx, score) in enumerate(ranked_indices, 1):
         ranked_images.append(
@@ -325,6 +326,7 @@ def rank_images_by_attention(
                 "attention_score": float(score),
                 "image": images[idx],
                 "attention_map": attention[idx],
+                "original_index": idx  # Add original index
             }
         )
 

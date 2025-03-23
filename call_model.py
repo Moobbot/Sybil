@@ -135,6 +135,13 @@ def predict(
     series_with_attention = None
     attention_info = None
 
+    # Move dicom_metadata_list initialization up before we need it
+    dicom_metadata_list = []
+    if file_type == "dicom":
+        dicom_metadata_list = [pydicom.dcmread(f) for f in input_files]
+        if not dicom_metadata_list:
+            logging.warning("⚠️ No DICOM metadata could be loaded from input files")
+
     if return_attentions:
         attention_path = os.path.join(output_dir, "attention_scores.pkl")
         with open(attention_path, "wb") as f:
@@ -165,13 +172,6 @@ def predict(
         ranking_path = os.path.join(output_dir, "image_ranking.json")
         with open(ranking_path, "w") as f:
             json.dump(attention_info, f, indent=2)
-
-    # If you choose to save dicom photos, take the metadata of each photo
-    dicom_metadata_list = []
-    if (save_as_dicom or visualize_attentions_img) and file_type == "dicom":
-        dicom_metadata_list = [pydicom.dcmread(f) for f in input_files]
-        if not dicom_metadata_list:
-            logging.warning("⚠️ No DICOM metadata could be loaded from input files")
 
     # Call Visualize_attentions with its own Metadata list
     if visualize_attentions_img:
