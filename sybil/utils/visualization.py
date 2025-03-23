@@ -1,3 +1,4 @@
+import logging
 import os
 import imageio
 import numpy as np
@@ -6,56 +7,52 @@ import torch
 import torch.nn.functional as F
 from sybil.serie import Serie
 from typing import Dict, List, Union
-import logging
+import os
 
 
 def collate_attentions(
     attention_dict: Dict[str, np.ndarray], N: int, eps=1e-6
 ) -> np.ndarray:
-    """Tổng hợp attention từ mô hình."""
-    if not attention_dict:
-        raise ValueError(
-            "⚠️ Attention dictionary is empty. Ensure model returns valid attention maps."
-        )
+    a1 = attention_dict["image_attention_1"]
+    v1 = attention_dict["volume_attention_1"]
 
-    a1 = torch.tensor(attention_dict.get("image_attention_1"), dtype=torch.float32)
-    v1 = torch.tensor(attention_dict.get("volume_attention_1"), dtype=torch.float32)
+    a1 = torch.Tensor(a1)
+    v1 = torch.Tensor(v1)
 
-    # Mean over ensemble
+    # take mean attention over ensemble
     a1 = torch.exp(a1).mean(0)
     v1 = torch.exp(v1).mean(0)
 
     attention = a1 * v1.unsqueeze(-1)
     attention = attention.view(1, 25, 16, 16)
 
-    # Upscale attention map
-    attention_up = (
-        F.interpolate(attention.unsqueeze(0), (N, 512, 512), mode="trilinear")
-        .cpu()
-        .numpy()
-        .squeeze()
+    attention_up = F.interpolate(
+        attention.unsqueeze(0), (N, 512, 512), mode="trilinear"
     )
-    attention_up[attention_up <= eps] = 0.0  # Apply threshold
+    attention_up = attention_up.cpu().numpy()
+    attention_up = attention_up.squeeze()
+    if eps:
+        attention_up[attention_up <= eps] = 0.0
 
     return attention_up
 
 
 def build_overlayed_images(
     images: List[np.ndarray], attention: np.ndarray, gain: int = 3
-) -> List[np.ndarray]:
-    """Xây dựng ảnh overlay từ attention maps."""
+):
     overlayed_images = []
-    for img, att in zip(images, attention):
-        overlayed = np.zeros((512, 512, 3), dtype=np.uint8)
-        overlayed[..., 2] = img  # Channel Red
-        overlayed[..., 1] = img  # Channel Green
+    N = len(images)
+    for i in range(N):
+        overlayed = np.zeros((512, 512, 3))
+        overlayed[..., 2] = images[i]
+        overlayed[..., 1] = images[i]
         overlayed[..., 0] = np.clip(
-            (att * gain * 256) + img, a_min=0, a_max=255
-        ).astype(
-            np.uint8
-        )  # Channel Blue
+            (attention[i, ...] * gain * 256) + images[i],
+            a_min=0,
+            a_max=255,
+        )
 
-        overlayed_images.append(overlayed)
+        overlayed_images.append(np.uint8(overlayed))
 
     return overlayed_images
 
@@ -72,6 +69,8 @@ def save_images(img_list: List[np.ndarray], directory: str, name: str):
     Returns:
         None
     """
+    import imageio
+
     os.makedirs(directory, exist_ok=True)
     path = os.path.join(directory, f"{name}.gif")
     imageio.mimsave(path, img_list)
@@ -216,10 +215,14 @@ def visualize_attentions(
         series = [series]
 
     if not attentions or len(attentions) == 0:
-        raise ValueError("⚠️ Attention data is empty. Ensure `return_attentions=True` when predicting.")
+        raise ValueError(
+            "⚠️ Attention data is empty. Ensure `return_attentions=True` when predicting."
+        )
 
     if dicom_metadata_list and len(dicom_metadata_list) < len(series):
-        logging.warning("⚠️ DICOM metadata list is shorter than the number of series. Some images may be missing metadata.")
+        logging.warning(
+            "⚠️ DICOM metadata list is shorter than the number of series. Some images may be missing metadata."
+        )
 
     series_overlays = []
     for serie_idx, serie in enumerate(series):
@@ -228,7 +231,9 @@ def visualize_attentions(
 
         if serie_idx >= len(attentions) or attentions[serie_idx] is None:
             print(f"⚠️ Warning: Missing attention data for series {serie_idx}")
-            logging.warning(f"⚠️ Missing attention data for series {serie_idx}. Skipping.")
+            logging.warning(
+                f"⚠️ Missing attention data for series {serie_idx}. Skipping."
+            )
             continue
 
         cur_attention = collate_attentions(attentions[serie_idx], N)
@@ -256,3 +261,56 @@ def visualize_attentions(
         series_overlays.append(overlayed_images)
 
     return series_overlays
+
+
+def rank_images_by_attention(
+    attention_dict: Dict[str, np.ndarray],
+    images: List[np.ndarray],
+    N: int,
+    eps: float = 1e-6,
+) -> List[Dict[str, Union[int, float, np.ndarray]]]:
+    """
+    Rank images based on the predicted attention score.
+
+    Args:
+        attention_dict (Dict[str, np.ndarray]): Dictionary containing attention maps
+        images (List[np.ndarray]): List of original images
+        N (int): Number of images
+        eps (float): Minimum threshold for attention score
+
+    Returns:
+        List[Dict[str, Union[int, float, np.ndarray]]]: List of ranked images, each element is a dict containing:
+            - rank: The rank of the image
+            - attention_score: The attention score
+            - image: Original image
+            - attention_map: Corresponding attention map
+    """
+    # Calculate the attention map
+    attention = collate_attentions(attention_dict, N, eps)
+
+    # Calculate the attention score for each image
+    attention_scores = []
+    for i in range(N):
+        score = np.mean(attention[i])  # Can change the way to calculate the score
+        attention_scores.append((i, score))
+
+    # Sort by score in descending order
+    ranked_indices = sorted(attention_scores, key=lambda x: x[1], reverse=True)
+
+    # Create a list of dictionaries with the following keys:
+    # - rank: The rank of the image
+    # - attention_score: The attention score of the image
+    # - image: The image
+    # - attention_map: The attention map of the image
+    ranked_images = []
+    for rank, (idx, score) in enumerate(ranked_indices, 1):
+        ranked_images.append(
+            {
+                "rank": rank,
+                "attention_score": float(score),
+                "image": images[idx],
+                "attention_map": attention[idx],
+            }
+        )
+
+    return ranked_images
