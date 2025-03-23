@@ -96,8 +96,9 @@ def save_gif(img_list: List[np.ndarray], directory: str, name: str):
 def remove_diacritics(text):
     """Remove diacritics from Vietnamese text"""
     import unicodedata
-    text = unicodedata.normalize('NFKD', text)
-    return u"".join([c for c in text if not unicodedata.combining(c)])
+
+    text = unicodedata.normalize("NFKD", text)
+    return "".join([c for c in text if not unicodedata.combining(c)])
 
 
 def save_attention_images(
@@ -120,7 +121,7 @@ def save_attention_images(
     # Create a list of indices in correct order (0 to N-1)
     N = len(overlayed_images)
     indices = list(range(N))
-    
+
     # Calculate number of digits needed for zero padding
     num_digits = len(str(N))
 
@@ -133,20 +134,26 @@ def save_attention_images(
             if dicom_metadata_list and i < len(dicom_metadata_list):
                 try:
                     # Get patient name from DICOM metadata
-                    if hasattr(dicom_metadata_list[i], 'PatientName'):
+                    if hasattr(dicom_metadata_list[i], "PatientName"):
                         patient_name = str(dicom_metadata_list[i].PatientName)
                     # Remove diacritics and special characters
                     patient_name = remove_diacritics(patient_name)
                     # Replace spaces with underscores and remove special characters
-                    patient_name = ''.join(e for e in patient_name if e.isalnum() or e == ' ')
-                    patient_name = patient_name.replace(' ', '_')
+                    patient_name = "".join(
+                        e for e in patient_name if e.isalnum() or e == " "
+                    )
+                    patient_name = patient_name.replace(" ", "_")
                 except:
                     patient_name = f"Unknown_Patient"
-            
+
             if not patient_name:
                 # Fallback to original filename if no patient name
-                patient_name = os.path.splitext(os.path.basename(input_files[i]))[0] if input_files else f"Image"
-            
+                patient_name = (
+                    os.path.splitext(os.path.basename(input_files[i]))[0]
+                    if input_files
+                    else f"Image"
+                )
+
             # Create filename with patient name and zero-padded number, using (N-1)-i to reverse the order
             base_filename = f"pred_{patient_name}_{(N-1)-i:0{num_digits}d}"
 
@@ -157,7 +164,9 @@ def save_attention_images(
                 print(f"Saved overlay PNG: {png_path}")
             else:
                 if i >= len(dicom_metadata_list):
-                    logging.warning(f"Skipping slice {i}: No corresponding DICOM metadata found.")
+                    logging.warning(
+                        f"Skipping slice {i}: No corresponding DICOM metadata found."
+                    )
                     continue
 
                 try:
@@ -304,6 +313,7 @@ def rank_images_by_attention(
             - attention_score: The attention score
             - image: Original image
             - attention_map: Corresponding attention map
+            - original_index: Original index of the image
     """
     # Calculate the attention map
     attention = collate_attentions(attention_dict, N, eps)
@@ -311,22 +321,29 @@ def rank_images_by_attention(
     # Calculate the attention score for each image
     attention_scores = []
     for i in range(N):
-        score = np.mean(attention[i])  # Can change the way to calculate the score
+        # Tính toán attention score cho từng slice
+        slice_attention = attention[i]
+        # Lấy trung bình của các giá trị attention > eps
+        mask = slice_attention > eps
+        if mask.any():
+            score = slice_attention[mask].mean()
+        else:
+            score = 0.0
         attention_scores.append((i, score))
 
     # Sort by score in descending order
-    ranked_indices = sorted(attention_scores, key=lambda x: x[1], reverse=True)
+    # ranked_indices = sorted(attention_scores, key=lambda x: x[1], reverse=True)
 
     # Create a list of dictionaries with ranking info
     ranked_images = []
-    for rank, (idx, score) in enumerate(ranked_indices, 1):
+    for rank, (idx, score) in enumerate(attention_scores, 1):
         ranked_images.append(
             {
                 "rank": rank,
                 "attention_score": float(score),
                 "image": images[idx],
                 "attention_map": attention[idx],
-                "original_index": idx  # Add original index
+                "original_index": idx,
             }
         )
 
