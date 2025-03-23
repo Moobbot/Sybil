@@ -112,11 +112,9 @@ def predict(
         f"Beginning prediction using {num_files} {file_type} files from {image_dir}"
     )
 
-    # print("Load model")
     # Load a trained model
     if model is None:
         model = load_model()
-    # print("model loaded")
 
     # Create Serie object - Get risk scores
     serie = Serie(input_files, voxel_spacing=voxel_spacing, file_type=file_type)
@@ -156,25 +154,10 @@ def predict(
                     "file_name_pred": f"pred_{os.path.basename(input_files[i])}",
                     "rank": item["rank"],
                     "attention_score": item["attention_score"],
-                    # ,"max_attention": float(np.max(item["attention_map"])),
-                    # "mean_attention": float(np.mean(item["attention_map"])),
-                    # "attention_map_shape": item["attention_map"].shape
                 }
                 for i, item in enumerate(ranked_images)
                 if item["attention_score"] > 0  # Only include images with attention_score > 0
             ]
-            # ,"summary": {
-            #     "total_images": len(ranked_images),
-            #     "max_attention_score": float(
-            #         max(item["attention_score"] for item in ranked_images)
-            #     ),
-            #     "min_attention_score": float(
-            #         min(item["attention_score"] for item in ranked_images)
-            #     ),
-            #     "mean_attention_score": float(
-            #         np.mean([item["attention_score"] for item in ranked_images])
-            #     ),
-            # }
         }
 
         # Save the ranking results

@@ -9,10 +9,19 @@ from sybil.serie import Serie
 from typing import Dict, List, Union
 import os
 
+EPS = 1e-9  # 1e-3
+
 
 def collate_attentions(
-    attention_dict: Dict[str, np.ndarray], N: int, eps=1e-6
+    attention_dict: Dict[str, np.ndarray], N: int, eps=EPS
 ) -> np.ndarray:
+    """
+    Collate attention maps from a dictionary of attention maps.
+
+    Args:
+        attention_dict (Dict[str, np.ndarray]): Dictionary containing attention maps.
+        N (int): Number of images.
+    """
     a1 = attention_dict["image_attention_1"]
     v1 = attention_dict["volume_attention_1"]
 
@@ -40,6 +49,13 @@ def collate_attentions(
 def build_overlayed_images(
     images: List[np.ndarray], attention: np.ndarray, gain: int = 3
 ):
+    """
+    Build overlayed images from a list of images and an attention map.
+
+    Args:
+        images (List[np.ndarray]): List of NumPy arrays representing the images.
+        attention (np.ndarray): NumPy array containing attention maps.
+    """
     overlayed_images = []
     N = len(images)
     for i in range(N):
@@ -57,7 +73,7 @@ def build_overlayed_images(
     return overlayed_images
 
 
-def save_images(img_list: List[np.ndarray], directory: str, name: str):
+def save_gif(img_list: List[np.ndarray], directory: str, name: str):
     """
     Saves a list of images as a GIF in the specified directory with the given name.
 
@@ -105,7 +121,7 @@ def save_attention_images(
                 filename = f"pred_{os.path.splitext(original_filename)[0]}.png"
             else:
                 filename = f"pred_{idx}.png"
-                
+
             overlay_path = os.path.join(save_path, filename)
             imageio.imwrite(overlay_path, img)
             print(f"Saved overlay PNG: {overlay_path}")
@@ -120,8 +136,7 @@ def save_attention_images_dicom(
     input_files: List[str] = None,
 ):
     """
-    Saves overlayed attention images as DICOM with RGB encoding, ensuring metadata is
-    properly set for CornerstoneJS visualization.
+    Saves overlayed attention images as DICOM with RGB encoding.
 
     Parameters:
     - overlayed_images: List of NumPy arrays representing the overlayed images.
@@ -147,7 +162,7 @@ def save_attention_images_dicom(
                 filename = f"pred_{os.path.splitext(original_filename)[0]}.dcm"
             else:
                 filename = f"pred_{idx}.dcm"
-                
+
             dicom_path = os.path.join(save_path, filename)
 
             if idx >= len(dicom_metadata_list):
@@ -208,7 +223,7 @@ def visualize_attentions(
     attentions: List[Dict[str, np.ndarray]],
     save_directory: str = None,
     gain: int = 3,
-    attention_threshold: float = 1e-3,
+    attention_threshold: float = EPS,
     save_as_dicom: bool = False,
     dicom_metadata_list: List[pydicom.Dataset] = None,
     input_files: List[str] = None,
@@ -257,12 +272,14 @@ def visualize_attentions(
             continue
 
         cur_attention = collate_attentions(attentions[serie_idx], N)
+
         overlayed_images = build_overlayed_images(images, cur_attention, gain)
 
         if save_directory:
             save_path = os.path.join(save_directory, f"serie_{serie_idx}")
             os.makedirs(save_path, exist_ok=True)
 
+            # Save images in the correct order
             if save_as_dicom and dicom_metadata_list:
                 save_attention_images_dicom(
                     overlayed_images,
@@ -270,18 +287,19 @@ def visualize_attentions(
                     save_path,
                     attention_threshold,
                     dicom_metadata_list,
-                    input_files
+                    input_files,
                 )
             else:
                 save_attention_images(
-                    overlayed_images, 
-                    cur_attention, 
-                    save_path, 
+                    overlayed_images,
+                    cur_attention,
+                    save_path,
                     attention_threshold,
-                    input_files
+                    input_files,
                 )
 
-            save_images(overlayed_images, save_path, f"serie_{serie_idx}")
+            # Save GIF with correctly ordered images
+            save_gif(overlayed_images, save_path, f"serie_{serie_idx}")
 
         series_overlays.append(overlayed_images)
 
@@ -292,7 +310,7 @@ def rank_images_by_attention(
     attention_dict: Dict[str, np.ndarray],
     images: List[np.ndarray],
     N: int,
-    eps: float = 1e-3,
+    eps: float = EPS,
 ) -> List[Dict[str, Union[int, float, np.ndarray]]]:
     """
     Rank images based on the predicted attention score.
