@@ -249,6 +249,7 @@ def predict(
             save_as_dicom=save_as_dicom,
             dicom_metadata_list=dicom_metadata_list,
             input_files=input_files,
+            save_original=True
         )
 
     return pred_dict, series_with_attention, attention_info

@@ -48,23 +48,25 @@ def collate_attentions(
 def build_overlayed_images(
     images: List[np.ndarray], 
     attention: np.ndarray, 
-    gain: int = cfg['DEFAULT_GAIN']
+    gain: int = cfg['DEFAULT_GAIN'],
+    save_original: bool = False
 ) -> List[np.ndarray]:
     """
     Build overlayed images from a list of images and an attention map.
-    If attention values are below threshold, returns original image without overlay.
-
+    
     Args:
         images (List[np.ndarray]): List of NumPy arrays representing the images.
         attention (np.ndarray): NumPy array containing attention maps.
         gain (int): Factor to scale attention values.
+        save_original (bool): If True, save original image when no significant attention.
+                            If False, always create overlay even with minimal attention.
     """
     overlayed_images = []
     N = len(images)
     for i in range(N):
-        # Kiểm tra nếu attention map có giá trị đáng kể
-        if np.any(attention[i] > cfg['EPS']):
-            # Tạo overlay nếu có attention đáng kể
+        if not save_original or np.any(attention[i] > cfg['EPS']):
+            # Tạo overlay cho mọi trường hợp nếu save_original=False
+            # hoặc khi có attention đáng kể nếu save_original=True
             overlayed = np.zeros((512, 512, 3))
             overlayed[..., 2] = images[i]
             overlayed[..., 1] = images[i]
@@ -75,8 +77,7 @@ def build_overlayed_images(
             )
             overlayed_images.append(np.uint8(overlayed))
         else:
-            # Nếu không có attention đáng kể, sử dụng ảnh gốc
-            # Chuyển ảnh gốc thành RGB
+            # Chỉ lưu ảnh gốc khi save_original=True và không có attention đáng kể
             original = np.zeros((512, 512, 3))
             original[..., 0] = images[i]
             original[..., 1] = images[i]
@@ -187,6 +188,7 @@ def visualize_attentions(
     save_as_dicom: bool = False,
     dicom_metadata_list: List[pydicom.Dataset] = None,
     input_files: List[str] = None,
+    save_original: bool = False,
 ) -> List[List[np.ndarray]]:
     """
     Generates overlayed attention images and saves them as PNG or DICOM.
@@ -200,6 +202,8 @@ def visualize_attentions(
         save_as_dicom (bool): If True, saves images as DICOM instead of PNG.
         dicom_metadata_list (Optional[List[pydicom.Dataset]]): Metadata list for DICOM images.
         input_files (Optional[List[str]]): List of original input file paths.
+        save_original (bool): If True, save original image when no significant attention.
+                            If False, always create overlay. Defaults to False.
 
     Returns:
         List[List[np.ndarray]]: List of overlayed image lists per series.
@@ -233,7 +237,12 @@ def visualize_attentions(
 
         cur_attention = collate_attentions(attentions[serie_idx], N)
 
-        overlayed_images = build_overlayed_images(images, cur_attention, gain)
+        overlayed_images = build_overlayed_images(
+            images, 
+            cur_attention, 
+            gain,
+            save_original
+        )
 
         if save_directory:
             save_path = os.path.join(save_directory, f"serie_{serie_idx}")
@@ -304,7 +313,6 @@ def rank_images_by_attention(
     for rank, (idx, score) in enumerate(attention_scores, 1):
         ranked_images.append(
             {
-                "rank": rank,
                 "attention_score": float(score),
                 "image": images[idx],
                 "attention_map": attention[idx],
