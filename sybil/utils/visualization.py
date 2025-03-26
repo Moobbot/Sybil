@@ -7,7 +7,7 @@ import torch
 import torch.nn.functional as F
 from sybil.serie import Serie
 from typing import Dict, List, Union
-from config import VISUALIZATION_CONFIG as cfg
+from config import MODEL_CONFIG, VISUALIZATION_CONFIG as cfg
 from .config import VISUALIZATION_CONFIG as viz_cfg
 from .dicom_handler import DicomHandler
 
@@ -120,8 +120,7 @@ def save_attention_images(
     overlayed_images: List[np.ndarray],
     cur_attention: np.ndarray,
     save_path: str,
-    attention_threshold: float,
-    save_as_dicom: bool = False,
+    save_as_dicom: bool = MODEL_CONFIG["SAVE_AS_DICOM_DEFAULT"],
     dicom_metadata_list: List[pydicom.Dataset] = None,
     input_files: List[str] = None,
 ):
@@ -186,11 +185,10 @@ def visualize_attentions(
     attentions: List[Dict[str, np.ndarray]],
     save_directory: str = None,
     gain: int = viz_cfg["DEFAULT_GAIN"],
-    attention_threshold: float = viz_cfg["DEFAULT_ATTENTION_THRESHOLD"],
-    save_as_dicom: bool = False,
+    save_as_dicom: bool = MODEL_CONFIG["SAVE_AS_DICOM_DEFAULT"],
+    save_original: bool = MODEL_CONFIG["SAVE_ORIGINAL_DEFAULT"],
     dicom_metadata_list: List[pydicom.Dataset] = None,
     input_files: List[str] = None,
-    save_original: bool = False,
 ) -> List[List[np.ndarray]]:
     """
     Generates overlayed attention images and saves them as PNG or DICOM.
@@ -251,7 +249,6 @@ def visualize_attentions(
                 overlayed_images,
                 cur_attention,
                 save_path,
-                attention_threshold,
                 save_as_dicom,
                 dicom_metadata_list,
                 input_files,

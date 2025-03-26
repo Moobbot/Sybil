@@ -3,7 +3,7 @@ VISUALIZATION_CONFIG = {
     # General constants
     "EPS": 1e-6,  # Epsilon value for numerical stability
     "DEFAULT_GAIN": 3,  # Hệ số khuếch đại mặc định cho attention map
-    "DEFAULT_ATTENTION_THRESHOLD": 1e-9,  # Ngưỡng attention mặc định
+    "DEFAULT_ATTENTION_THRESHOLD": 1e-6,  # Ngưỡng attention mặc định
     "IMAGE_SIZE": (512, 512),  # Kích thước ảnh chuẩn
     # Cấu hình DICOM
     "DICOM": {
