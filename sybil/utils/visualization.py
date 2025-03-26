@@ -7,13 +7,12 @@ import torch
 import torch.nn.functional as F
 from sybil.serie import Serie
 from typing import Dict, List, Union
-import os
-
-EPS = 1e-9  # 1e-3
+from .config import VISUALIZATION_CONFIG as cfg
+from .dicom_handler import DicomHandler
 
 
 def collate_attentions(
-    attention_dict: Dict[str, np.ndarray], N: int, eps=EPS
+    attention_dict: Dict[str, np.ndarray], N: int, eps=cfg['EPS']
 ) -> np.ndarray:
     """
     Collate attention maps from a dictionary of attention maps.
@@ -118,24 +117,17 @@ def save_attention_images(
     if save_as_dicom and dicom_metadata_list is None:
         raise ValueError("dicom_metadata_list is required when saving as DICOM format")
 
-    # Create a list of indices in correct order (0 to N-1)
     N = len(overlayed_images)
     indices = list(range(N))
-
-    # Calculate number of digits needed for zero padding
     num_digits = len(str(N))
 
-    # Process images in correct order
     for i in indices:
         attention = cur_attention[i]
         if np.mean(attention) > attention_threshold:
-            # Get patient name from DICOM metadata if available
+            # Get patient name
             patient_name = ""
-
             if input_files:
-                # Get the base filename without extension
                 base_name = os.path.splitext(os.path.basename(input_files[i]))[0]
-                # Split by underscore and remove the last part if it's a number
                 parts = base_name.split('_')
                 if parts and parts[-1].isdigit():
                     patient_name = '_'.join(parts[:-1])
@@ -144,7 +136,6 @@ def save_attention_images(
             else:
                 patient_name = f"Unknown_Patient"
 
-            # Create filename with patient name and zero-padded number, using (N-1)-i to reverse the order
             base_filename = f"pred_{patient_name}_{(N-1)-i:0{num_digits}d}"
 
             if not save_as_dicom:
@@ -159,56 +150,20 @@ def save_attention_images(
                     )
                     continue
 
-                try:
-                    # Get metadata from original image
-                    ds = dicom_metadata_list[i].copy()
-
-                    # Convert image to uint8 (0-255)
-                    img_uint8 = np.clip(overlayed_images[i], 0, 255).astype(np.uint8)
-
-                    # Configure metadata for RGB DICOM
-                    ds.Rows, ds.Columns = img_uint8.shape[:2]
-                    ds.SamplesPerPixel = 3
-                    ds.PhotometricInterpretation = "RGB"
-                    ds.BitsAllocated = 8
-                    ds.BitsStored = 8
-                    ds.HighBit = 7
-                    ds.PlanarConfiguration = 0
-                    ds.PixelRepresentation = 0
-                    ds.RescaleIntercept = 0
-                    ds.RescaleSlope = 1
-                    ds.VOILUTFunction = "LINEAR"
-
-                    # Copy important metadata
-                    for attr in [
-                        "PixelSpacing",
-                        "SliceLocation",
-                        "ImagePositionPatient",
-                        "ImageOrientationPatient",
-                        "InstanceNumber",
-                    ]:
-                        if hasattr(dicom_metadata_list[i], attr):
-                            setattr(ds, attr, getattr(dicom_metadata_list[i], attr))
-
-                    ds.PixelData = img_uint8.tobytes()
-
-                    # Save DICOM image
-                    dicom_path = os.path.join(save_path, f"{base_filename}.dcm")
-                    ds.save_as(dicom_path)
-                    logging.info(f"✅ Successfully saved DICOM overlay: {dicom_path}")
-                    print(f"✅ Saved DICOM overlay (RGB): {dicom_path}")
-
-                except Exception as e:
-                    logging.error(f"⚠️ Error saving DICOM slice {i}: {str(e)}")
-                    print(f"⚠️ Error saving DICOM slice {i}: {str(e)}")
+                DicomHandler.save_overlay_as_dicom(
+                    overlayed_images[i],
+                    dicom_metadata_list[i],
+                    save_path,
+                    base_filename
+                )
 
 
 def visualize_attentions(
     series: Union[Serie, List[Serie]],
     attentions: List[Dict[str, np.ndarray]],
     save_directory: str = None,
-    gain: int = 3,
-    attention_threshold: float = EPS,
+    gain: int = cfg['DEFAULT_GAIN'],
+    attention_threshold: float = cfg['DEFAULT_ATTENTION_THRESHOLD'],
     save_as_dicom: bool = False,
     dicom_metadata_list: List[pydicom.Dataset] = None,
     input_files: List[str] = None,
@@ -286,7 +241,7 @@ def rank_images_by_attention(
     attention_dict: Dict[str, np.ndarray],
     images: List[np.ndarray],
     N: int,
-    eps: float = EPS,
+    eps: float = cfg['EPS'],
 ) -> List[Dict[str, Union[int, float, np.ndarray]]]:
     """
     Rank images based on the predicted attention score.

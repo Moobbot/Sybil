@@ -6,14 +6,14 @@ from flask import Blueprint, request, jsonify, send_file, send_from_directory
 from config import RESULTS_FOLDER, UPLOAD_FOLDER
 from call_model import load_model, predict
 from utils import (
-    create_zip_result,
-    dicom_to_png,
-    extract_zip_file,
-    get_overlay_files,
-    get_valid_files,
-    save_uploaded_files,
-    get_file_path,
     save_uploaded_zip,
+    save_uploaded_files,
+    extract_zip_file,
+    dicom_to_png,
+    get_file_path,
+    get_valid_files,
+    get_overlay_files,
+    create_zip_result,
 )
 
 bp = Blueprint("routes", __name__)
