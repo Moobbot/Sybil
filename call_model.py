@@ -16,13 +16,14 @@ from config import (
     MODEL_PATHS,
     CALIBRATOR_PATH,
     PREDICTION_CONFIG,
-    VISUALIZATION_CONFIG,
+    VISUALIZATION_CONFIG as cfg,
 )
 from sybil.datasets import utils as utils_datasets
 from sybil.model import Sybil
 from sybil.serie import Serie
 from sybil.utils import logging_utils
 from sybil.utils.visualization import visualize_attentions, rank_images_by_attention
+from sybil.utils.config import VISUALIZATION_CONFIG as vsl_config
 
 
 def download_checkpoints():
@@ -137,10 +138,10 @@ def process_attention_scores(
     prediction,
     serie,
     input_files,
-    return_type: str = VISUALIZATION_CONFIG["RANKING"]["DEFAULT_RETURN_TYPE"],
-    top_k: int = VISUALIZATION_CONFIG["RANKING"]["DEFAULT_TOP_K"],
+    return_type: str = cfg["RANKING"]["DEFAULT_RETURN_TYPE"],
+    top_k: int = cfg["RANKING"]["DEFAULT_TOP_K"],
 ) -> Dict:
-    """Process and rank attention scores.
+    """Process and rank attention scores with correct index reversal.
 
     Args:
         prediction: Model prediction object
@@ -178,40 +179,58 @@ def process_attention_scores(
     N = len(serie.get_raw_images())
     num_digits = len(str(N))
 
-    # Process attention scores
+    # Process attention scores with reversed indexing to match save_attention_images
     attention_scores = []
     for item in ranked_images:
-        idx = item["original_index"]
+        original_idx = item["original_index"]
         score = item["attention_score"]
 
-        if score > 0:  # Chỉ thêm ảnh có attention score > 0
-            patient_name_info = get_patient_name(input_files[idx])
+        if score > 0:  # Only add images with attention score > 0
+            # Calculate the reversed index as used in save_attention_images
+            reversed_idx = (N - 1) - original_idx
+            # ! TODO: Cách tính id viec so sánh này có đúng không?
+            # ! - Màu đỏ của attention_scores có đúng không?
+            # Ensure the index is valid for input_files
+            if original_idx < len(input_files):
+                # Get original file name and info
+                original_file = input_files[original_idx]
+                original_filename = os.path.basename(original_file)
 
-            # Tạo tên file dự đoán
-            if patient_name_info[1]:  # Nếu có số thứ tự
-                pred_filename = f"pred_{patient_name_info[0]}_{int(patient_name_info[1]):0{num_digits}d}.dcm"
+                # Extract patient name
+                base_name = os.path.splitext(original_filename)[0]
+                parts = base_name.split("_")
+
+                if parts and parts[-1].isdigit():
+                    patient_name = "_".join(parts[:-1])
+                    # Create prediction filename using the reversed index
+                    pred_filename = f"{vsl_config['FILE_NAMING']['PREDICTION_PREFIX']}{patient_name}_{reversed_idx:0{num_digits}d}.png"  # Use .png or .dcm as needed
+                else:
+                    patient_name = base_name
+                    pred_filename = f"{vsl_config['FILE_NAMING']['PREDICTION_PREFIX']}{patient_name}_{reversed_idx:0{num_digits}d}.png"  # Use .png or .dcm as needed
+
+                attention_scores.append(
+                    {
+                        # "file_name_original": original_filename,
+                        "file_name_pred": pred_filename,
+                        "rank": item["rank"],
+                        "attention_score": score,
+                        "original_index": original_idx,
+                        "reversed_index": reversed_idx,
+                    }
+                )
             else:
-                pred_filename = (
-                    f"pred_{patient_name_info[0]}_{(N-1)-idx:0{num_digits}d}.dcm"
+                print(
+                    f"⚠️ Warning: Index {original_idx} is out of range for input_files (length {len(input_files)})"
                 )
 
-            attention_scores.append(
-                {
-                    "file_name_original": os.path.basename(input_files[idx]),
-                    "file_name_pred": pred_filename,
-                    "rank": item["rank"],
-                    "attention_score": score,
-                }
-            )
-
-    # Tạo kết quả trả về với thông tin bổ sung
+    # Create result with additional information
     result = {
         "attention_scores": attention_scores,
         "total_images": N,
         "returned_images": len(attention_scores),
     }
 
-    # Thêm thông tin về top_k nếu được sử dụng
+    # Add information about top_k if used
     if return_type.lower() == "top" and top_k is not None:
         result["top_k_requested"] = top_k
 

@@ -271,7 +271,7 @@ def rank_images_by_attention(
     top_k: int = cfg["RANKING"]["DEFAULT_TOP_K"],
 ) -> Union[List[Dict[str, Union[int, float, np.ndarray]]], None]:
     """
-    Rank images based on the predicted attention score.
+    Rank images based on the predicted attention score with emphasis on intensity.
 
     Args:
         attention_dict (Dict[str, np.ndarray]): Dictionary containing attention maps
@@ -301,45 +301,101 @@ def rank_images_by_attention(
     for i in range(N):
         slice_attention = attention[i]
         mask = slice_attention > eps
+
         if mask.any():
-            score = slice_attention[mask].mean()
+            # Calculate key metrics
+            max_attention = slice_attention.max()
+            total_attention = slice_attention[mask].sum()
+            mean_attention = slice_attention[mask].mean()
+            area_ratio = mask.sum() / mask.size
+
+            # Calculate high-intensity attention metrics
+            if (
+                mask.sum() >= 5
+            ):  # Ensure we have enough pixels for percentile calculation
+                p75_attention = np.percentile(slice_attention[mask], 75)
+                p90_attention = np.percentile(slice_attention[mask], 90)
+                p95_attention = np.percentile(slice_attention[mask], 95)
+
+                # Count pixels in different intensity bands
+                high_band = (slice_attention > p90_attention).sum()
+                very_high_band = (slice_attention > p95_attention).sum()
+            else:
+                p75_attention = mean_attention
+                p90_attention = max_attention
+                p95_attention = max_attention
+                high_band = mask.sum()
+                very_high_band = mask.sum()
+
+            # Prioritize maximum intensity with a power function to emphasize peaks
+            intensity_score = max_attention**2
+
+            # Calculate weighted score that heavily favors intensity over area
+            # This formula gives much higher weight to maximum intensity and high percentiles
+            intensity_weight = 0.8
+            area_weight = 0.2
+
+            # Intensity component emphasizes peak values
+            intensity_component = (
+                max_attention * 0.5 + p95_attention * 0.3 + p90_attention * 0.2
+            ) * intensity_weight
+
+            # Area component gives some consideration to total attention
+            area_component = total_attention * area_weight
+
+            # Add a bonus for very high intensity regions
+            high_intensity_bonus = very_high_band * p95_attention * 0.1
+
+            score = intensity_component + area_component + high_intensity_bonus
+
+            # Store diagnostic information for debugging
+            debug_info = {
+                "max": float(max_attention),
+                "mean": float(mean_attention),
+                "p95": float(p95_attention) if mask.sum() >= 5 else 0,
+                "area_ratio": float(area_ratio),
+                "final_score": float(score),
+            }
+
+            attention_scores.append((i, score, debug_info))
         else:
-            score = 0.0
-        attention_scores.append((i, score))
+            attention_scores.append(
+                (
+                    i,
+                    0.0,
+                    {"max": 0, "mean": 0, "p95": 0, "area_ratio": 0, "final_score": 0},
+                )
+            )
 
     # Sort by score in descending order
     sorted_scores = sorted(attention_scores, key=lambda x: x[1], reverse=True)
+
+    # Print debug information for top images to help with tuning
+    print(f"\nAttention Score Ranking (Top {top_k}):")
+    for rank, (idx, score, debug) in enumerate(
+        sorted_scores[: min(top_k, len(sorted_scores))], 1
+    ):
+        print(f"Rank {rank}: Index {idx}, Score: {score:.6f}")
+        print(
+            f"  Max: {debug['max']:.6f}, Mean: {debug['mean']:.6f}, P95: {debug['p95']:.6f}, Area: {debug['area_ratio']:.6f}"
+        )
 
     # Return None if return_type is 'none'
     if return_type.lower() == "none":
         return None
 
-    # Create a list of dictionaries with ranking info
+    # Create output list with appropriate number of images
     ranked_images = []
+    scores_to_process = (
+        sorted_scores[:top_k] if return_type.lower() == "top" else sorted_scores
+    )
 
-    # Determine how many images to process
-    if return_type.lower() == "top":
-        if top_k is None:
-            raise ValueError("top_k must be specified when return_type='top'")
-        if top_k <= 0:
-            raise ValueError("top_k must be positive")
-        if top_k > N:
-            logging.warning(
-                f"top_k ({top_k}) is larger than number of images ({N}). Using all images."
-            )
-            top_k = N
-        scores_to_process = sorted_scores[:top_k]
-    else:  # 'all'
-        scores_to_process = sorted_scores
-
-    # Create output list
-    for rank, (idx, score) in enumerate(scores_to_process, 1):
+    for rank, (idx, score, _) in enumerate(scores_to_process, 1):
         ranked_images.append(
             {
                 "rank": rank,
                 "attention_score": float(score),
                 "image": images[idx],
-                # "attention_map": attention[idx],
                 "original_index": idx,
             }
         )

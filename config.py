@@ -34,7 +34,7 @@ VISUALIZATION_CONFIG = {
     "RANKING": {
         "DEFAULT_RETURN_TYPE": "top",  # 'all', 'top', hoặc 'none'
         "DEFAULT_TOP_K": 6,  # Số lượng ảnh top mặc định
-        "MIN_SCORE": 0.0,  # Điểm attention tối thiểu để xem xét
+        # "MIN_SCORE": 0.0,  # Điểm attention tối thiểu để xem xét
     },
 }
 
