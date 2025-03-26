@@ -3,7 +3,7 @@ import uuid
 import zipfile
 import shutil
 from flask import Blueprint, request, jsonify, send_file, send_from_directory
-from config import RESULTS_FOLDER, UPLOAD_FOLDER
+from config import PREDICTION_CONFIG, RESULTS_FOLDER, UPLOAD_FOLDER
 from call_model import load_model, predict
 from utils import (
     save_uploaded_zip,
@@ -70,15 +70,12 @@ def api_predict():
     print(f"Session ID: {session_id}, Output directory: {output_dir}")
 
     # Run prediction
-    pred_dict, _, attention_info = predict(
-        unzip_path, output_dir, model, visualize_attentions_img=True, save_as_dicom=True
-    )
+    pred_dict, _, attention_info = predict(unzip_path, output_dir, model)
 
-    overlay_images_link = os.path.join(output_dir, "serie_0")
+    overlay_images_link = os.path.join(output_dir, PREDICTION_CONFIG["OVERLAY_PATH"])
+
     # Zip the prediction results
-    result_zip_path = create_zip_result(
-        overlay_images_link, session_id, folder_save=RESULTS_FOLDER
-    )
+    create_zip_result(overlay_images_link, session_id, folder_save=RESULTS_FOLDER)
 
     # Delete the intermediate directory
     shutil.rmtree(unzip_path)

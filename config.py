@@ -27,3 +27,28 @@ MODEL_PATHS = [
 ]
 
 CALIBRATOR_PATH = os.path.join(CHECKPOINT_DIR, "sybil_ensemble_simple_calibrator.json")
+
+# Cấu hình Visualization
+VISUALIZATION_CONFIG = {
+    # Cấu hình attention ranking
+    "RANKING": {
+        "DEFAULT_RETURN_TYPE": "top",  # 'all', 'top', hoặc 'none'
+        "DEFAULT_TOP_K": 6,  # Số lượng ảnh top mặc định
+        "MIN_SCORE": 0.0,  # Điểm attention tối thiểu để xem xét
+    },
+}
+
+# Cấu hình Model
+MODEL_CONFIG = {
+    "RETURN_ATTENTIONS_DEFAULT": True,
+    "WRITE_ATTENTION_IMAGES_DEFAULT": True,
+    "SAVE_AS_DICOM_DEFAULT": True,
+    "SAVE_ORIGINAL_DEFAULT": True,
+}
+
+PREDICTION_CONFIG = {
+    "OVERLAY_PATH": "overlay",
+    "PREDICTION_PATH": os.path.join(RESULTS_FOLDER, "prediction_scores.json"),
+    "ATTENTION_PATH": os.path.join(RESULTS_FOLDER, "attention_scores.pkl"),
+    "RANKING_PATH": os.path.join(RESULTS_FOLDER, "image_ranking.json"),
+}

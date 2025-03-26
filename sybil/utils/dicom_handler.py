@@ -34,19 +34,19 @@ class DicomHandler:
             
             # Configure metadata for RGB DICOM
             ds.Rows, ds.Columns = img_uint8.shape[:2]
-            ds.SamplesPerPixel = cfg['DICOM_SAMPLES_PER_PIXEL']
-            ds.PhotometricInterpretation = cfg['DICOM_PHOTOMETRIC_INTERPRETATION']
-            ds.BitsAllocated = cfg['DICOM_BITS_ALLOCATED']
-            ds.BitsStored = cfg['DICOM_BITS_STORED']
-            ds.HighBit = cfg['DICOM_HIGH_BIT']
-            ds.PlanarConfiguration = cfg['DICOM_PLANAR_CONFIGURATION']
-            ds.PixelRepresentation = cfg['DICOM_PIXEL_REPRESENTATION']
-            ds.RescaleIntercept = cfg['DICOM_RESCALE_INTERCEPT']
-            ds.RescaleSlope = cfg['DICOM_RESCALE_SLOPE']
-            ds.VOILUTFunction = cfg['DICOM_VOI_LUT_FUNCTION']
+            ds.SamplesPerPixel = cfg['DICOM']['SAMPLES_PER_PIXEL']
+            ds.PhotometricInterpretation = cfg['DICOM']['PHOTOMETRIC_INTERPRETATION']
+            ds.BitsAllocated = cfg['DICOM']['BITS_ALLOCATED']
+            ds.BitsStored = cfg['DICOM']['BITS_STORED']
+            ds.HighBit = cfg['DICOM']['HIGH_BIT']
+            ds.PlanarConfiguration = cfg['DICOM']['PLANAR_CONFIGURATION']
+            ds.PixelRepresentation = cfg['DICOM']['PIXEL_REPRESENTATION']
+            ds.RescaleIntercept = cfg['DICOM']['RESCALE_INTERCEPT']
+            ds.RescaleSlope = cfg['DICOM']['RESCALE_SLOPE']
+            ds.VOILUTFunction = cfg['DICOM']['VOI_LUT_FUNCTION']
             
             # Copy important metadata attributes
-            for attr in cfg['DICOM_ATTRIBUTES_TO_COPY']:
+            for attr in cfg['DICOM']['ATTRIBUTES_TO_COPY']:
                 if hasattr(original_metadata, attr):
                     setattr(ds, attr, getattr(original_metadata, attr))
             

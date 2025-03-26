@@ -7,12 +7,13 @@ import torch
 import torch.nn.functional as F
 from sybil.serie import Serie
 from typing import Dict, List, Union
-from .config import VISUALIZATION_CONFIG as cfg
+from config import VISUALIZATION_CONFIG as cfg
+from .config import VISUALIZATION_CONFIG as viz_cfg
 from .dicom_handler import DicomHandler
 
 
 def collate_attentions(
-    attention_dict: Dict[str, np.ndarray], N: int, eps=cfg['EPS']
+    attention_dict: Dict[str, np.ndarray], N: int, eps=viz_cfg["EPS"]
 ) -> np.ndarray:
     """
     Collate attention maps from a dictionary of attention maps.
@@ -46,14 +47,14 @@ def collate_attentions(
 
 
 def build_overlayed_images(
-    images: List[np.ndarray], 
-    attention: np.ndarray, 
-    gain: int = cfg['DEFAULT_GAIN'],
-    save_original: bool = False
+    images: List[np.ndarray],
+    attention: np.ndarray,
+    gain: int = viz_cfg["DEFAULT_GAIN"],
+    save_original: bool = False,
 ) -> List[np.ndarray]:
     """
     Build overlayed images from a list of images and an attention map.
-    
+
     Args:
         images (List[np.ndarray]): List of NumPy arrays representing the images.
         attention (np.ndarray): NumPy array containing attention maps.
@@ -64,7 +65,7 @@ def build_overlayed_images(
     overlayed_images = []
     N = len(images)
     for i in range(N):
-        if not save_original or np.any(attention[i] > cfg['EPS']):
+        if not save_original or np.any(attention[i] > viz_cfg["EPS"]):
             # Tạo overlay cho mọi trường hợp nếu save_original=False
             # hoặc khi có attention đáng kể nếu save_original=True
             overlayed = np.zeros((512, 512, 3))
@@ -139,14 +140,14 @@ def save_attention_images(
     for i in indices:
         attention = cur_attention[i]
         mean_attention = np.mean(attention)
-        
+
         # Get patient name
         patient_name = ""
         if input_files:
             base_name = os.path.splitext(os.path.basename(input_files[i]))[0]
-            parts = base_name.split('_')
+            parts = base_name.split("_")
             if parts and parts[-1].isdigit():
-                patient_name = '_'.join(parts[:-1])
+                patient_name = "_".join(parts[:-1])
             else:
                 patient_name = base_name
         else:
@@ -155,15 +156,19 @@ def save_attention_images(
         base_filename = f"pred_{patient_name}_{(N-1)-i:0{num_digits}d}"
 
         # Thêm thông tin về loại ảnh vào tên file
-        if mean_attention <= cfg['EPS']:
+        if mean_attention <= viz_cfg["EPS"]:
             base_filename = f"{base_filename}_original"
-            logging.info(f"Saving original image for slice {i} (no significant attention)")
-        
+            logging.info(
+                f"Saving original image for slice {i} (no significant attention)"
+            )
+
         if not save_as_dicom:
             # Save as PNG
             png_path = os.path.join(save_path, f"{base_filename}.png")
             imageio.imwrite(png_path, overlayed_images[i])
-            print(f"Saved {'original' if mean_attention <= cfg['EPS'] else 'overlay'} PNG: {png_path}")
+            print(
+                f"Saved {'original' if mean_attention <= viz_cfg['EPS'] else 'overlay'} PNG: {png_path}"
+            )
         else:
             if i >= len(dicom_metadata_list):
                 logging.warning(
@@ -172,10 +177,7 @@ def save_attention_images(
                 continue
 
             DicomHandler.save_overlay_as_dicom(
-                overlayed_images[i],
-                dicom_metadata_list[i],
-                save_path,
-                base_filename
+                overlayed_images[i], dicom_metadata_list[i], save_path, base_filename
             )
 
 
@@ -183,8 +185,8 @@ def visualize_attentions(
     series: Union[Serie, List[Serie]],
     attentions: List[Dict[str, np.ndarray]],
     save_directory: str = None,
-    gain: int = cfg['DEFAULT_GAIN'],
-    attention_threshold: float = cfg['DEFAULT_ATTENTION_THRESHOLD'],
+    gain: int = viz_cfg["DEFAULT_GAIN"],
+    attention_threshold: float = viz_cfg["DEFAULT_ATTENTION_THRESHOLD"],
     save_as_dicom: bool = False,
     dicom_metadata_list: List[pydicom.Dataset] = None,
     input_files: List[str] = None,
@@ -238,10 +240,7 @@ def visualize_attentions(
         cur_attention = collate_attentions(attentions[serie_idx], N)
 
         overlayed_images = build_overlayed_images(
-            images, 
-            cur_attention, 
-            gain,
-            save_original
+            images, cur_attention, gain, save_original
         )
 
         if save_directory:
@@ -270,8 +269,10 @@ def rank_images_by_attention(
     attention_dict: Dict[str, np.ndarray],
     images: List[np.ndarray],
     N: int,
-    eps: float = cfg['EPS'],
-) -> List[Dict[str, Union[int, float, np.ndarray]]]:
+    eps: float = viz_cfg["EPS"],
+    return_type: str = cfg["RANKING"]["DEFAULT_RETURN_TYPE"],
+    top_k: int = cfg["RANKING"]["DEFAULT_TOP_K"],
+) -> Union[List[Dict[str, Union[int, float, np.ndarray]]], None]:
     """
     Rank images based on the predicted attention score.
 
@@ -280,10 +281,16 @@ def rank_images_by_attention(
         images (List[np.ndarray]): List of original images
         N (int): Number of images
         eps (float): Minimum threshold for attention score
+        return_type (str): Type of return:
+            - 'all': Return all images (default)
+            - 'top': Return top K images
+            - 'none': Don't return images
+        top_k (int): Number of top images to return when return_type='top'
 
     Returns:
-        List[Dict[str, Union[int, float, np.ndarray]]]: List of ranked images, each element is a dict containing:
-            - rank: The rank of the image
+        Union[List[Dict[str, Union[int, float, np.ndarray]]], None]: List of ranked images or None
+        Each element in list contains:
+            - rank: The rank of the image (1-based)
             - attention_score: The attention score
             - image: Original image
             - attention_map: Corresponding attention map
@@ -295,9 +302,7 @@ def rank_images_by_attention(
     # Calculate the attention score for each image
     attention_scores = []
     for i in range(N):
-        # Tính toán attention score cho từng slice
         slice_attention = attention[i]
-        # Lấy trung bình của các giá trị attention > eps
         mask = slice_attention > eps
         if mask.any():
             score = slice_attention[mask].mean()
@@ -306,16 +311,38 @@ def rank_images_by_attention(
         attention_scores.append((i, score))
 
     # Sort by score in descending order
-    # ranked_indices = sorted(attention_scores, key=lambda x: x[1], reverse=True)
+    sorted_scores = sorted(attention_scores, key=lambda x: x[1], reverse=True)
+
+    # Return None if return_type is 'none'
+    if return_type.lower() == "none":
+        return None
 
     # Create a list of dictionaries with ranking info
     ranked_images = []
-    for rank, (idx, score) in enumerate(attention_scores, 1):
+
+    # Determine how many images to process
+    if return_type.lower() == "top":
+        if top_k is None:
+            raise ValueError("top_k must be specified when return_type='top'")
+        if top_k <= 0:
+            raise ValueError("top_k must be positive")
+        if top_k > N:
+            logging.warning(
+                f"top_k ({top_k}) is larger than number of images ({N}). Using all images."
+            )
+            top_k = N
+        scores_to_process = sorted_scores[:top_k]
+    else:  # 'all'
+        scores_to_process = sorted_scores
+
+    # Create output list
+    for rank, (idx, score) in enumerate(scores_to_process, 1):
         ranked_images.append(
             {
+                "rank": rank,
                 "attention_score": float(score),
                 "image": images[idx],
-                "attention_map": attention[idx],
+                # "attention_map": attention[idx],
                 "original_index": idx,
             }
         )

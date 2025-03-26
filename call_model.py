@@ -6,14 +6,14 @@ import zipfile
 import json
 from flask import logging
 import numpy as np
+from typing import Literal, Dict
 
 import pydicom
-from config import CHECKPOINT_DIR, CHECKPOINT_URL, MODEL_PATHS, CALIBRATOR_PATH
+from config import CHECKPOINT_DIR, CHECKPOINT_URL, MODEL_CONFIG, MODEL_PATHS, CALIBRATOR_PATH, PREDICTION_CONFIG, VISUALIZATION_CONFIG
 from sybil.datasets import utils as utils_datasets
 from sybil.model import Sybil
 from sybil.serie import Serie
 from sybil.utils import logging_utils
-from typing import Literal
 from sybil.utils.visualization import visualize_attentions, rank_images_by_attention
 
 
@@ -122,54 +122,94 @@ def get_patient_name(file_name):
     else:
         return base_name, ""
 
-def process_attention_scores(prediction, serie, input_files):
+def process_attention_scores(
+    prediction, 
+    serie, 
+    input_files,
+    return_type: str = VISUALIZATION_CONFIG["RANKING"]["DEFAULT_RETURN_TYPE"],
+    top_k: int = VISUALIZATION_CONFIG["RANKING"]["DEFAULT_TOP_K"]
+) -> Dict:
     """Process and rank attention scores.
     
     Args:
         prediction: Model prediction object
         serie: Serie object containing images
         input_files (list): List of input file paths
+        return_type (str): Type of return:
+            - 'all': Return all images (default)
+            - 'top': Return top K images
+            - 'none': Don't return any images
+        top_k (int): Number of top images to return when return_type='top'
         
     Returns:
-        dict: Processed attention information
+        dict: Processed attention information containing:
+            - attention_scores: List of dicts with file info and scores
+            - total_images: Total number of images processed
+            - returned_images: Number of images returned
     """
+    # Get ranked images based on attention
     ranked_images = rank_images_by_attention(
         prediction.attentions[0],
         serie.get_raw_images(),
         len(serie.get_raw_images()),
+        return_type=return_type,
+        top_k=top_k
     )
 
-    N = len(ranked_images)
+    # Return minimal info if return_type is 'none'
+    if return_type.lower() == 'none' or ranked_images is None:
+        return {
+            "attention_scores": [],
+            "total_images": len(serie.get_raw_images()),
+            "returned_images": 0
+        }
+
+    N = len(serie.get_raw_images())
     num_digits = len(str(N))
 
-    attention_info = {
-        "attention_scores": [
-            {
-                "file_name_original": os.path.basename(input_files[i]),
-                "file_name_pred": (
-                    f"pred_{get_patient_name(input_files[i])[0]}_{int(get_patient_name(input_files[i])[1]):0{num_digits}d}.dcm"
-                    if get_patient_name(input_files[i])[1]
-                    else f"pred_{get_patient_name(input_files[i])[0]}_{(N-1)-i:0{num_digits}d}.dcm"
-                ),
+    # Process attention scores
+    attention_scores = []
+    for item in ranked_images:
+        idx = item["original_index"]
+        score = item["attention_score"]
+        
+        if score > 0:  # Chỉ thêm ảnh có attention score > 0
+            patient_name_info = get_patient_name(input_files[idx])
+            
+            # Tạo tên file dự đoán
+            if patient_name_info[1]:  # Nếu có số thứ tự
+                pred_filename = f"pred_{patient_name_info[0]}_{int(patient_name_info[1]):0{num_digits}d}.dcm"
+            else:
+                pred_filename = f"pred_{patient_name_info[0]}_{(N-1)-idx:0{num_digits}d}.dcm"
+            
+            attention_scores.append({
+                "file_name_original": os.path.basename(input_files[idx]),
+                "file_name_pred": pred_filename,
                 "rank": item["rank"],
-                "attention_score": item["attention_score"],
-            }
-            for i, item in enumerate(ranked_images)
-            if item["attention_score"] > 0
-        ]
+                "attention_score": score,
+            })
+
+    # Tạo kết quả trả về với thông tin bổ sung
+    result = {
+        "attention_scores": attention_scores,
+        "total_images": N,
+        "returned_images": len(attention_scores)
     }
-    
-    return attention_info
+
+    # Thêm thông tin về top_k nếu được sử dụng
+    if return_type.lower() == 'top' and top_k is not None:
+        result["top_k_requested"] = top_k
+        
+    return result
 
 def predict(
     image_dir,
     output_dir,
     model=None,
-    return_attentions=True,
-    visualize_attentions_img=False,
-    save_as_dicom=False,
     file_type: Literal["auto", "dicom", "png"] = "auto",
     threads: int = 0,
+    return_attentions: bool = MODEL_CONFIG["RETURN_ATTENTIONS_DEFAULT"],
+    write_attention_images: bool = MODEL_CONFIG["WRITE_ATTENTION_IMAGES_DEFAULT"],
 ):
     """Run the model prediction.
 
@@ -178,7 +218,7 @@ def predict(
         output_dir (str): The directory to save the prediction results.
         model (Sybil): The model to use for prediction.
         return_attentions (bool): Whether to return the attention scores.
-        visualize_attentions_img (bool): Whether to visualize attention maps
+        write_attention_images (bool): Whether to visualize attention maps
         save_as_dicom (bool): Whether to save visualizations as DICOM
         file_type (str): Type of input files ("auto", "dicom", or "png")
         threads (int): Number of threads to use
@@ -211,7 +251,7 @@ def predict(
     logger.debug(f"Prediction finished. Results:\n{prediction_scores}")
 
     # Save predictions
-    prediction_path = os.path.join(output_dir, "prediction_scores.json")
+    prediction_path = PREDICTION_CONFIG["PREDICTION_PATH"]
     pred_dict = {"predictions": prediction.scores}
     with open(prediction_path, "w") as f:
         json.dump(pred_dict, f, indent=2)
@@ -228,28 +268,27 @@ def predict(
 
     # Process attention scores if requested
     if return_attentions:
-        attention_path = os.path.join(output_dir, "attention_scores.pkl")
+        attention_path = PREDICTION_CONFIG["ATTENTION_PATH"]
         with open(attention_path, "wb") as f:
             pickle.dump(prediction, f)
 
         attention_info = process_attention_scores(prediction, serie, input_files)
         
         # Save rankings
-        ranking_path = os.path.join(output_dir, "image_ranking.json")
+        ranking_path = PREDICTION_CONFIG["RANKING_PATH"]
         with open(ranking_path, "w") as f:
             json.dump(attention_info, f, indent=2)
 
     # Visualize attention if requested
-    if visualize_attentions_img:
+    if write_attention_images:
         series_with_attention = visualize_attentions(
             [serie],
             attentions=prediction.attentions,
             save_directory=output_dir,
-            gain=3,
-            save_as_dicom=save_as_dicom,
             dicom_metadata_list=dicom_metadata_list,
             input_files=input_files,
-            save_original=True
+            save_as_dicom=MODEL_CONFIG["SAVE_AS_DICOM_DEFAULT"],
+            save_original=MODEL_CONFIG["SAVE_ORIGINAL_DEFAULT"]
         )
 
     return pred_dict, series_with_attention, attention_info
