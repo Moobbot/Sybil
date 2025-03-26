@@ -46,28 +46,42 @@ def collate_attentions(
 
 
 def build_overlayed_images(
-    images: List[np.ndarray], attention: np.ndarray, gain: int = 3
-):
+    images: List[np.ndarray], 
+    attention: np.ndarray, 
+    gain: int = cfg['DEFAULT_GAIN']
+) -> List[np.ndarray]:
     """
     Build overlayed images from a list of images and an attention map.
+    If attention values are below threshold, returns original image without overlay.
 
     Args:
         images (List[np.ndarray]): List of NumPy arrays representing the images.
         attention (np.ndarray): NumPy array containing attention maps.
+        gain (int): Factor to scale attention values.
     """
     overlayed_images = []
     N = len(images)
     for i in range(N):
-        overlayed = np.zeros((512, 512, 3))
-        overlayed[..., 2] = images[i]
-        overlayed[..., 1] = images[i]
-        overlayed[..., 0] = np.clip(
-            (attention[i, ...] * gain * 256) + images[i],
-            a_min=0,
-            a_max=255,
-        )
-
-        overlayed_images.append(np.uint8(overlayed))
+        # Kiểm tra nếu attention map có giá trị đáng kể
+        if np.any(attention[i] > cfg['EPS']):
+            # Tạo overlay nếu có attention đáng kể
+            overlayed = np.zeros((512, 512, 3))
+            overlayed[..., 2] = images[i]
+            overlayed[..., 1] = images[i]
+            overlayed[..., 0] = np.clip(
+                (attention[i, ...] * gain * 256) + images[i],
+                a_min=0,
+                a_max=255,
+            )
+            overlayed_images.append(np.uint8(overlayed))
+        else:
+            # Nếu không có attention đáng kể, sử dụng ảnh gốc
+            # Chuyển ảnh gốc thành RGB
+            original = np.zeros((512, 512, 3))
+            original[..., 0] = images[i]
+            original[..., 1] = images[i]
+            original[..., 2] = images[i]
+            overlayed_images.append(np.uint8(original))
 
     return overlayed_images
 
@@ -123,39 +137,45 @@ def save_attention_images(
 
     for i in indices:
         attention = cur_attention[i]
-        if np.mean(attention) > attention_threshold:
-            # Get patient name
-            patient_name = ""
-            if input_files:
-                base_name = os.path.splitext(os.path.basename(input_files[i]))[0]
-                parts = base_name.split('_')
-                if parts and parts[-1].isdigit():
-                    patient_name = '_'.join(parts[:-1])
-                else:
-                    patient_name = base_name
+        mean_attention = np.mean(attention)
+        
+        # Get patient name
+        patient_name = ""
+        if input_files:
+            base_name = os.path.splitext(os.path.basename(input_files[i]))[0]
+            parts = base_name.split('_')
+            if parts and parts[-1].isdigit():
+                patient_name = '_'.join(parts[:-1])
             else:
-                patient_name = f"Unknown_Patient"
+                patient_name = base_name
+        else:
+            patient_name = f"Unknown_Patient"
 
-            base_filename = f"pred_{patient_name}_{(N-1)-i:0{num_digits}d}"
+        base_filename = f"pred_{patient_name}_{(N-1)-i:0{num_digits}d}"
 
-            if not save_as_dicom:
-                # Save as PNG
-                png_path = os.path.join(save_path, f"{base_filename}.png")
-                imageio.imwrite(png_path, overlayed_images[i])
-                print(f"Saved overlay PNG: {png_path}")
-            else:
-                if i >= len(dicom_metadata_list):
-                    logging.warning(
-                        f"Skipping slice {i}: No corresponding DICOM metadata found."
-                    )
-                    continue
-
-                DicomHandler.save_overlay_as_dicom(
-                    overlayed_images[i],
-                    dicom_metadata_list[i],
-                    save_path,
-                    base_filename
+        # Thêm thông tin về loại ảnh vào tên file
+        if mean_attention <= cfg['EPS']:
+            base_filename = f"{base_filename}_original"
+            logging.info(f"Saving original image for slice {i} (no significant attention)")
+        
+        if not save_as_dicom:
+            # Save as PNG
+            png_path = os.path.join(save_path, f"{base_filename}.png")
+            imageio.imwrite(png_path, overlayed_images[i])
+            print(f"Saved {'original' if mean_attention <= cfg['EPS'] else 'overlay'} PNG: {png_path}")
+        else:
+            if i >= len(dicom_metadata_list):
+                logging.warning(
+                    f"Skipping slice {i}: No corresponding DICOM metadata found."
                 )
+                continue
+
+            DicomHandler.save_overlay_as_dicom(
+                overlayed_images[i],
+                dicom_metadata_list[i],
+                save_path,
+                base_filename
+            )
 
 
 def visualize_attentions(

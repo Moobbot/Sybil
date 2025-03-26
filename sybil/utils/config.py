@@ -1,11 +1,11 @@
 # Constants for visualization
 VISUALIZATION_CONFIG = {
     # General constants
-    'EPS': 1e-9,  # Epsilon value for numerical stability
+    'EPS': 1e-6,  # Epsilon value for numerical stability
     
     # Image processing
     'DEFAULT_GAIN': 3,
-    'DEFAULT_ATTENTION_THRESHOLD': 1e-9,
+    'DEFAULT_ATTENTION_THRESHOLD': 1e-6,
     'DEFAULT_IMAGE_SIZE': (512, 512),
     
     # DICOM specific
