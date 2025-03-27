@@ -199,23 +199,23 @@ def process_attention_scores(
                 # Extract patient name
                 base_name = os.path.splitext(original_filename)[0]
                 parts = base_name.split("_")
-
+                file_type = "dcm" if MODEL_CONFIG["SAVE_AS_DICOM_DEFAULT"] else "png"
                 if parts and parts[-1].isdigit():
                     patient_name = "_".join(parts[:-1])
                     # Create prediction filename using the reversed index
-                    pred_filename = f"{vsl_config['FILE_NAMING']['PREDICTION_PREFIX']}{patient_name}_{reversed_idx:0{num_digits}d}.png"  # Use .png or .dcm as needed
+                    pred_filename = f"{vsl_config['FILE_NAMING']['PREDICTION_PREFIX']}{patient_name}_{reversed_idx:0{num_digits}d}.{file_type}"  # Use .png or .dcm as needed
                 else:
                     patient_name = base_name
-                    pred_filename = f"{vsl_config['FILE_NAMING']['PREDICTION_PREFIX']}{patient_name}_{reversed_idx:0{num_digits}d}.png"  # Use .png or .dcm as needed
+                    pred_filename = f"{vsl_config['FILE_NAMING']['PREDICTION_PREFIX']}{patient_name}_{reversed_idx:0{num_digits}d}.{file_type}"  # Use .png or .dcm as needed
 
                 attention_scores.append(
                     {
-                        # "file_name_original": original_filename,
                         "file_name_pred": pred_filename,
-                        "rank": item["rank"],
                         "attention_score": score,
-                        "original_index": original_idx,
-                        "reversed_index": reversed_idx,
+                        # "file_name_original": original_filename,
+                        # "rank": item["rank"],
+                        # "original_index": original_idx,
+                        # "reversed_index": reversed_idx,
                     }
                 )
             else:

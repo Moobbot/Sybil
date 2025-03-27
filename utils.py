@@ -10,7 +10,7 @@ import numpy as np
 import pydicom
 from PIL import Image
 from werkzeug.utils import secure_filename
-from config import RESULTS_FOLDER, UPLOAD_FOLDER
+from config import PREDICTION_CONFIG, PYTHON_ENV, RESULTS_FOLDER, UPLOAD_FOLDER
 
 
 def allowed_file(filename):
@@ -103,6 +103,7 @@ def get_file_path(session_id, filename):
 def get_overlay_files(output_dir, session_id):
     """Lấy danh sách ảnh overlay trong thư mục 'serie_0'."""
     overlay_dir = os.path.join(output_dir, "serie_0")
+    # PREDICTION_CONFIG["OVERLAY_PATH"]
 
     if not os.path.exists(overlay_dir) or not os.listdir(overlay_dir):
         print(f"⚠️ No overlay images found for session {session_id}")
@@ -171,10 +172,16 @@ def get_valid_files(unzip_path):
 def create_zip_result(output_dir, session_id, folder_save=RESULTS_FOLDER):
     """Nén ảnh dự đoán thành file ZIP"""
     result_zip_path = os.path.join(folder_save, f"{session_id}.zip")
+    if PYTHON_ENV == "develop":
+        print(f"Creating zip file from {output_dir} to {result_zip_path}")
+
     with zipfile.ZipFile(result_zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         for root, _, files in os.walk(output_dir):
             for file in files:
                 file_path = os.path.join(root, file)
                 arcname = os.path.relpath(file_path, output_dir)
                 zipf.write(file_path, arcname)
+
+    if PYTHON_ENV == "develop":
+        print(f"Zip file size: {os.path.getsize(result_zip_path)} bytes")
     return result_zip_path

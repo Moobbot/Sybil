@@ -3,7 +3,7 @@ import uuid
 import zipfile
 import shutil
 from flask import Blueprint, request, jsonify, send_file, send_from_directory
-from config import PREDICTION_CONFIG, RESULTS_FOLDER, UPLOAD_FOLDER
+from config import PREDICTION_CONFIG, PYTHON_ENV, RESULTS_FOLDER, UPLOAD_FOLDER
 from call_model import load_model, predict
 from utils import (
     save_uploaded_zip,
@@ -72,17 +72,40 @@ def api_predict():
     # Run prediction
     pred_dict, _, attention_info = predict(unzip_path, output_dir, model)
 
-    overlay_images_link = os.path.join(output_dir, PREDICTION_CONFIG["OVERLAY_PATH"])
+    # Đường dẫn tới thư mục chứa ảnh overlay
+    overlay_images_link = os.path.join(output_dir, "serie_0")
+    # PREDICTION_CONFIG["OVERLAY_PATH"]
+
+    # Kiểm tra thư mục overlay có tồn tại và có ảnh không
+    if not os.path.exists(overlay_images_link):
+        return jsonify({"error": "Overlay images folder not found"}), 500
+
+    overlay_files = os.listdir(overlay_images_link)
+    if not overlay_files:
+        return jsonify({"error": "No overlay images generated"}), 500
+
+    print(f"Found {len(overlay_files)} overlay images in {overlay_images_link}")
 
     # Zip the prediction results
-    create_zip_result(overlay_images_link, session_id, folder_save=RESULTS_FOLDER)
+    try:
+        zip_path = create_zip_result(
+            overlay_images_link, session_id, folder_save=RESULTS_FOLDER
+        )
+        print(f"Created zip file at: {zip_path}")
 
-    # Delete the intermediate directory
-    shutil.rmtree(unzip_path)
-    shutil.rmtree(output_dir)
+        if not os.path.exists(zip_path) or os.path.getsize(zip_path) == 0:
+            return jsonify({"error": "Failed to create zip file"}), 500
+
+    except Exception as e:
+        print(f"Error creating zip file: {str(e)}")
+        return jsonify({"error": f"Failed to create zip file: {str(e)}"}), 500
 
     base_url = request.host_url.rstrip("/")
     zip_download_link = f"{base_url}/download_zip/{session_id}"
+
+    # Delete the intermediate directories after creating zip file
+    shutil.rmtree(unzip_path)
+    shutil.rmtree(output_dir)
 
     # Return the JSON result including the ZIP download link and attention information
     response = {
@@ -92,7 +115,8 @@ def api_predict():
         "attention_info": attention_info,
         "message": "Prediction successful.",
     }
-
+    if PYTHON_ENV == "develop":
+        print(f"Response: {response}")
     return jsonify(response)
 
 
@@ -197,6 +221,7 @@ def download_zip(session_id):
 def preview_file(session_id, filename):
     """API to preview overlay photos"""
     overlay_dir = os.path.join(RESULTS_FOLDER, session_id, "serie_0")
+    # PREDICTION_CONFIG["OVERLAY_PATH"]
     file_path = os.path.join(overlay_dir, filename)
 
     if os.path.exists(file_path):
@@ -215,7 +240,8 @@ def preview_file(session_id, filename):
 @bp.route("/download_gif/<session_id>", methods=["GET"])
 def download_gif(session_id):
     """API to download the GIF file of Overlay."""
-    gif_filename = "serie_0.gif"
+    gif_filename = "serie_0.gif"  # f"{PREDICTION_CONFIG['OVERLAY_PATH']}.gif"
+
     gif_path = get_file_path(session_id, gif_filename)
 
     if os.path.exists(gif_path):

@@ -156,7 +156,9 @@ def save_attention_images(
 
         # Thêm thông tin về loại ảnh vào tên file
         if mean_attention <= viz_cfg["EPS"]:
-            base_filename = f"{base_filename}_original"
+            base_filename = (
+                f"{base_filename}{viz_cfg['FILE_NAMING']['ORIGINAL_SUFFIX']}"
+            )
             logging.info(
                 f"Saving original image for slice {i} (no significant attention)"
             )
@@ -263,6 +265,93 @@ def visualize_attentions(
 
 
 def rank_images_by_attention(
+    attention_dict: Dict[str, np.ndarray],
+    images: List[np.ndarray],
+    N: int,
+    eps: float = viz_cfg["EPS"],
+    return_type: str = cfg["RANKING"]["DEFAULT_RETURN_TYPE"],
+    top_k: int = cfg["RANKING"]["DEFAULT_TOP_K"],
+) -> Union[List[Dict[str, Union[int, float, np.ndarray]]], None]:
+    """
+    Rank images based on the predicted attention score with emphasis on intensity.
+
+    Args:
+        attention_dict (Dict[str, np.ndarray]): Dictionary containing attention maps
+        images (List[np.ndarray]): List of original images
+        N (int): Number of images
+        eps (float): Minimum threshold for attention score
+        return_type (str): Type of return:
+            - 'all': Return all images (default)
+            - 'top': Return top K images
+            - 'none': Don't return images
+        top_k (int): Number of top images to return when return_type='top'
+
+    Returns:
+        Union[List[Dict[str, Union[int, float, np.ndarray]]], None]: List of ranked images or None
+        Each element in list contains:
+            - attention_score: The attention score
+            - original_index: Original index of the image
+    """
+    # Calculate the attention map
+    attention = collate_attentions(attention_dict, N, eps)
+
+    # Calculate the attention score for each image
+    attention_scores = []
+    for i in range(N):
+        slice_attention = attention[i]
+        mask = slice_attention > eps
+
+        if mask.any():
+            # Calculate key metrics
+            score = slice_attention[mask].mean()
+            # Store diagnostic information for debugging
+            debug_info = {
+                "score": float(score),
+            }
+
+            attention_scores.append((i, score, debug_info))
+        else:
+            attention_scores.append(
+                (
+                    i,
+                    0.0,
+                    {"score": 0},
+                )
+            )
+
+    # Sort by score in descending order
+    sorted_scores = sorted(attention_scores, key=lambda x: x[1], reverse=True)
+
+    # Print debug information for top images to help with tuning
+    print(f"\nAttention Score Ranking (Top {top_k}):")
+    for rank, (idx, score, debug) in enumerate(
+        sorted_scores[: min(top_k, len(sorted_scores))], 1
+    ):
+        print(f"Rank {rank}: Index {idx}, Score: {score:.6f}")
+        print(f"  Score: {debug['score']:.6f}")
+
+    # Return None if return_type is 'none'
+    if return_type.lower() == "none":
+        return None
+
+    # Create output list with appropriate number of images
+    ranked_images = []
+    scores_to_process = (
+        sorted_scores[:top_k] if return_type.lower() == "top" else sorted_scores
+    )
+
+    for rank, (idx, score, _) in enumerate(scores_to_process, 1):
+        ranked_images.append(
+            {
+                "attention_score": float(score),
+                "original_index": idx,
+            }
+        )
+
+    return ranked_images
+
+
+def rank_images_by_attention_vip(
     attention_dict: Dict[str, np.ndarray],
     images: List[np.ndarray],
     N: int,
