@@ -1,16 +1,17 @@
+import warnings
 from collections import OrderedDict
+
+import numpy as np
 from sklearn.metrics import (
     accuracy_score,
-    precision_score,
-    recall_score,
-    f1_score,
-    roc_auc_score,
-    precision_recall_curve,
     auc,
     average_precision_score,
+    f1_score,
+    precision_recall_curve,
+    precision_score,
+    recall_score,
+    roc_auc_score,
 )
-import numpy as np
-import warnings
 
 EPSILON = 1e-6
 BINARY_CLASSIF_THRESHOLD = 0.5
@@ -34,7 +35,8 @@ def get_classification_metrics(logging_dict, args):
         stats_dict["f1"] = f1_score(y_true=golds, y_pred=preds)
         num_pos = golds.sum()
         if num_pos > 0 and num_pos < len(golds):
-            stats_dict["auc"] = roc_auc_score(golds, probs[:, -1], average="samples")
+            stats_dict["auc"] = roc_auc_score(
+                golds, probs[:, -1], average="samples")
             stats_dict["ap_score"] = average_precision_score(
                 golds, probs[:, -1], average="samples"
             )
@@ -79,7 +81,8 @@ def get_alignment_metrics(logging_dict, args):
     probs = probs.reshape((-1, probs.shape[-1]))
 
     stats_dict["discrim_accuracy"] = accuracy_score(y_true=golds, y_pred=preds)
-    stats_dict["discrim_precision"] = precision_score(y_true=golds, y_pred=preds)
+    stats_dict["discrim_precision"] = precision_score(
+        y_true=golds, y_pred=preds)
     stats_dict["discrim_recall"] = recall_score(y_true=golds, y_pred=preds)
     stats_dict["discrim_f1"] = f1_score(y_true=golds, y_pred=preds)
     num_pos = golds.sum()
@@ -112,7 +115,8 @@ def get_risk_metrics(logging_dict, args):
             probs, censor_times, golds, followup, fup_lower_bound=0
         )
         stats_dict["{}_year_risk_auc".format(min_followup_if_neg)] = roc_auc
-        stats_dict["{}_year_risk_apscore".format(min_followup_if_neg)] = ap_score
+        stats_dict["{}_year_risk_apscore".format(
+            min_followup_if_neg)] = ap_score
         stats_dict["{}_year_risk_prauc".format(min_followup_if_neg)] = pr_auc
 
     return stats_dict
@@ -131,17 +135,20 @@ def compute_auc_at_followup(probs, censor_times, golds, followup, fup_lower_boun
 
     probs_for_eval, golds_for_eval = [], []
     for prob_arr, censor_time, gold in zip(probs, censor_times, golds):
-        include, label = include_exam_and_determine_label(prob_arr, censor_time, gold)
+        include, label = include_exam_and_determine_label(
+            prob_arr, censor_time, gold)
         if include:
             probs_for_eval.append(prob_arr[followup])
             golds_for_eval.append(label)
 
     try:
-        roc_auc = roc_auc_score(golds_for_eval, probs_for_eval, average="samples")
+        roc_auc = roc_auc_score(
+            golds_for_eval, probs_for_eval, average="samples")
         ap_score = average_precision_score(
             golds_for_eval, probs_for_eval, average="samples"
         )
-        precision, recall, _ = precision_recall_curve(golds_for_eval, probs_for_eval)
+        precision, recall, _ = precision_recall_curve(
+            golds_for_eval, probs_for_eval)
         pr_auc = auc(recall, precision)
     except Exception as e:
         warnings.warn("Failed to calculate AUC because {}".format(e))
@@ -153,6 +160,7 @@ def compute_auc_at_followup(probs, censor_times, golds, followup, fup_lower_boun
 
 def get_censoring_dist(train_dataset):
     from lifelines import KaplanMeierFitter
+
     _dataset = train_dataset.dataset
     times, event_observed = (
         [d["time_at_event"] for d in _dataset],
@@ -162,7 +170,8 @@ def get_censoring_dist(train_dataset):
     kmf = KaplanMeierFitter()
     kmf.fit(times, event_observed)
 
-    censoring_dist = {str(time): kmf.predict(time) for time in all_observed_times}
+    censoring_dist = {str(time): kmf.predict(time)
+                      for time in all_observed_times}
     return censoring_dist
 
 
@@ -309,6 +318,7 @@ def _concordance_summary_statistics(
     censored_pred = predicted_event_times[~died_mask][ix]
 
     from lifelines.utils.btree import _BTree
+
     censored_ix = 0
     died_ix = 0
     times_to_compare = {}
@@ -378,7 +388,8 @@ def _handle_pairs(truth, pred, first_ix, times_to_compare, censoring_dist):
     correct = np.int64(0)
     tied = np.int64(0)
     for i in range(first_ix, next_ix):
-        rank, count = times_to_compare[truth_time].rank(pred[i][int(truth_time)])
+        rank, count = times_to_compare[truth_time].rank(
+            pred[i][int(truth_time)])
         correct += rank
         tied += count
 

@@ -1,10 +1,10 @@
 import os
-import numpy as np
-import pydicom
-import pandas as pd
-from matplotlib import pyplot as plt
-from typing import List, Dict, Tuple, Optional
+from typing import Dict, List, Optional, Tuple
 
+import numpy as np
+import pandas as pd
+import pydicom
+from matplotlib import pyplot as plt
 
 # Dictionary for encoding types
 ENCODING_DICT = {
@@ -74,7 +74,8 @@ def check_dicom_encoding(dicom_path: str) -> Tuple[Optional[str], Optional[str]]
         print(f"📂 File: {dicom_path}")
         print(f"🔍 Transfer Syntax UID: {transfer_syntax_uid}")
 
-        encoding_type = ENCODING_DICT.get(str(transfer_syntax_uid), "🔴 Không xác định")
+        encoding_type = ENCODING_DICT.get(
+            str(transfer_syntax_uid), "🔴 Không xác định")
         print(f"✅ Kiểu mã hóa: {encoding_type}")
 
         return str(transfer_syntax_uid), encoding_type
@@ -201,7 +202,8 @@ def process_dicom_folder(
 
     print(f"🔍 Đang xử lý {len(dicom_files)} file DICOM...")
 
-    metadata_list = [read_dicom_metadata(dicom_file) for dicom_file in dicom_files]
+    metadata_list = [read_dicom_metadata(
+        dicom_file) for dicom_file in dicom_files]
     df = pd.DataFrame(metadata_list)
 
     df.to_excel(output_excel, index=False)

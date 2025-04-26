@@ -1,14 +1,15 @@
-from argparse import Namespace
-import hashlib
 import collections.abc as container_abcs
+import hashlib
 import re
+from argparse import Namespace
 from typing import Literal
+
 import torch
 from torch.utils import data
 
-from sybil.utils.sampler import DistributedWeightedSampler
 from sybil.augmentations import get_augmentations
-from sybil.loaders.image_loaders import OpenCVLoader, DicomLoader
+from sybil.loaders.image_loaders import DicomLoader, OpenCVLoader
+from sybil.utils.sampler import DistributedWeightedSampler
 
 string_classes = (str, bytes)
 int_classes = int
@@ -42,7 +43,8 @@ def default_collate(batch):
         if elem_type.__name__ == "ndarray" or elem_type.__name__ == "memmap":
             # array of string classes and object
             if np_str_obj_array_pattern.search(elem.dtype.str) is not None:
-                raise TypeError(default_collate_err_msg_format.format(elem.dtype))
+                raise TypeError(
+                    default_collate_err_msg_format.format(elem.dtype))
 
             return default_collate([torch.as_tensor(b) for b in batch])
         elif elem.shape == ():  # scalars
@@ -62,7 +64,8 @@ def default_collate(batch):
         it = iter(batch)
         elem_size = len(next(it))
         if not all(len(elem) == elem_size for elem in it):
-            raise RuntimeError("each element in list of batch should be of equal size")
+            raise RuntimeError(
+                "each element in list of batch should be of equal size")
         transposed = zip(*batch)
         return [default_collate(samples) for samples in transposed]
 

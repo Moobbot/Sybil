@@ -1,14 +1,17 @@
 import os
+from typing import Dict, List, Union
+
 import cv2
 import imageio
 import numpy as np
 import pydicom
 import torch
 import torch.nn.functional as F
-from sybil.serie import Serie
-from typing import Dict, List, Union
-from pydicom.uid import ExplicitVRLittleEndian
 from PIL import Image
+from pydicom.dataset import Dataset, FileMetaDataset
+from pydicom.uid import ExplicitVRLittleEndian, generate_uid
+
+from sybil.serie import Serie
 
 
 def collate_attentions(
@@ -20,8 +23,10 @@ def collate_attentions(
             "⚠️ Attention dictionary is empty. Ensure model returns valid attention maps."
         )
 
-    a1 = torch.tensor(attention_dict.get("image_attention_1"), dtype=torch.float32)
-    v1 = torch.tensor(attention_dict.get("volume_attention_1"), dtype=torch.float32)
+    a1 = torch.tensor(attention_dict.get(
+        "image_attention_1"), dtype=torch.float32)
+    v1 = torch.tensor(attention_dict.get(
+        "volume_attention_1"), dtype=torch.float32)
 
     # Mean over ensemble
     a1 = torch.exp(a1).mean(0)
@@ -67,7 +72,8 @@ def visualize_attentions(
     gain: int = 3,
     attention_threshold: float = 1e-3,
     save_as_dicom: bool = False,  # Lựa chọn lưu DICOM hoặc PNG
-    dicom_metadata_list: List[pydicom.Dataset] = None,  # Danh sách metadata DICOM
+    # Danh sách metadata DICOM
+    dicom_metadata_list: List[pydicom.Dataset] = None,
 ) -> List[List[np.ndarray]]:
     """
     Tạo ảnh overlay từ attention và lưu vào thư mục.
@@ -174,10 +180,9 @@ def save_attention_images(
             print(f"Saved overlay PNG: {overlay_path}")
 
 
-from pydicom.uid import ExplicitVRLittleEndian, generate_uid
-from pydicom.dataset import Dataset, FileMetaDataset
-
-def convert_png_to_dicom(png_path: str, dicom_metadata: pydicom.Dataset, output_dicom_path: str):
+def convert_png_to_dicom(
+    png_path: str, dicom_metadata: pydicom.Dataset, output_dicom_path: str
+):
     """
     Chuyển đổi PNG overlay sang DICOM nhưng giữ RGB và điều chỉnh Window Level.
 
@@ -229,10 +234,12 @@ def convert_png_to_dicom(png_path: str, dicom_metadata: pydicom.Dataset, output_
 
         # ✅ Lưu file DICOM P10 với định dạng chuẩn
         ds.save_as(output_dicom_path, write_like_original=False)
-        print(f"✅ Converted PNG to DICOM (RGB, Fixed WL/WW): {output_dicom_path}")
+        print(
+            f"✅ Converted PNG to DICOM (RGB, Fixed WL/WW): {output_dicom_path}")
 
     except Exception as e:
         print(f"⚠️ Error converting PNG to DICOM: {str(e)}")
+
 
 def save_attention_images_dicom(
     overlayed_images: List[np.ndarray],
@@ -267,7 +274,8 @@ def save_attention_images_dicom(
                 print(f"✅ Saved PNG: {png_path}")
 
                 # Convert PNG sang DICOM
-                convert_png_to_dicom(png_path, dicom_metadata_list[idx], dicom_path)
+                convert_png_to_dicom(
+                    png_path, dicom_metadata_list[idx], dicom_path)
 
             except Exception as e:
                 print(f"⚠️ Error saving DICOM slice {idx}: {str(e)}")

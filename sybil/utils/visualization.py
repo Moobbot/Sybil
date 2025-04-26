@@ -1,13 +1,17 @@
 import logging
 import os
+from typing import Dict, List, Union
+
 import imageio
 import numpy as np
 import pydicom
 import torch
 import torch.nn.functional as F
+
+from config import MODEL_CONFIG
+from config import VISUALIZATION_CONFIG as cfg
 from sybil.serie import Serie
-from typing import Dict, List, Union
-from config import MODEL_CONFIG, VISUALIZATION_CONFIG as cfg
+
 from .config import VISUALIZATION_CONFIG as viz_cfg
 from .dicom_handler import DicomHandler
 
@@ -130,7 +134,8 @@ def save_attention_images(
     os.makedirs(save_path, exist_ok=True)
 
     if save_as_dicom and dicom_metadata_list is None:
-        raise ValueError("dicom_metadata_list is required when saving as DICOM format")
+        raise ValueError(
+            "dicom_metadata_list is required when saving as DICOM format")
 
     N = len(overlayed_images)
     indices = list(range(N))
@@ -337,7 +342,8 @@ def rank_images_by_attention(
     # Create output list with appropriate number of images
     ranked_images = []
     scores_to_process = (
-        sorted_scores[:top_k] if return_type.lower() == "top" else sorted_scores
+        sorted_scores[:top_k] if return_type.lower(
+        ) == "top" else sorted_scores
     )
 
     for rank, (idx, score, _) in enumerate(scores_to_process, 1):
@@ -452,7 +458,8 @@ def rank_images_by_attention_vip(
                 (
                     i,
                     0.0,
-                    {"max": 0, "mean": 0, "p95": 0, "area_ratio": 0, "final_score": 0},
+                    {"max": 0, "mean": 0, "p95": 0,
+                        "area_ratio": 0, "final_score": 0},
                 )
             )
 
@@ -476,7 +483,8 @@ def rank_images_by_attention_vip(
     # Create output list with appropriate number of images
     ranked_images = []
     scores_to_process = (
-        sorted_scores[:top_k] if return_type.lower() == "top" else sorted_scores
+        sorted_scores[:top_k] if return_type.lower(
+        ) == "top" else sorted_scores
     )
 
     for rank, (idx, score, _) in enumerate(scores_to_process, 1):

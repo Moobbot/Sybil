@@ -1,12 +1,11 @@
 import math
-from typing import TypeVar, Optional, Iterator, Sequence
+from typing import Iterator, Optional, Sequence, TypeVar
 
 import torch
-from torch.utils.data import Dataset
 import torch.distributed as dist
+from torch.utils.data import Dataset
 
-
-T_co = TypeVar('T_co', covariant=True)
+T_co = TypeVar("T_co", covariant=True)
 
 
 class DistributedWeightedSampler(torch.utils.data.distributed.DistributedSampler):
@@ -44,17 +43,26 @@ class DistributedWeightedSampler(torch.utils.data.distributed.DistributedSampler
         ...     train(loader)
     """
 
-    def __init__(self, dataset: Dataset, weights: Sequence[float],
-                 replacement: bool = True, generator=None, num_replicas: Optional[int] = None,
-                 rank: Optional[int] = None,
-                 seed: int = 0, drop_last: bool = False) -> None:
+    def __init__(
+        self,
+        dataset: Dataset,
+        weights: Sequence[float],
+        replacement: bool = True,
+        generator=None,
+        num_replicas: Optional[int] = None,
+        rank: Optional[int] = None,
+        seed: int = 0,
+        drop_last: bool = False,
+    ) -> None:
         if num_replicas is None:
             if not dist.is_available():
-                raise RuntimeError("Requires distributed package to be available")
+                raise RuntimeError(
+                    "Requires distributed package to be available")
             num_replicas = dist.get_world_size()
         if rank is None:
             if not dist.is_available():
-                raise RuntimeError("Requires distributed package to be available")
+                raise RuntimeError(
+                    "Requires distributed package to be available")
             rank = dist.get_rank()
         self.dataset = dataset
         self.num_replicas = num_replicas
@@ -83,18 +91,19 @@ class DistributedWeightedSampler(torch.utils.data.distributed.DistributedSampler
 
         if not self.drop_last:
             # add extra samples to make it evenly divisible
-            indices += indices[:(self.total_size - len(indices))]
+            indices += indices[: (self.total_size - len(indices))]
         else:
             # remove tail of data to make it evenly divisible.
-            indices = indices[:self.total_size]
+            indices = indices[: self.total_size]
         assert len(indices) == self.total_size
 
         # subsample
-        indices = indices[self.rank:self.total_size:self.num_replicas]
-        weights = self.weights[self.rank:self.total_size:self.num_replicas]
+        indices = indices[self.rank: self.total_size: self.num_replicas]
+        weights = self.weights[self.rank: self.total_size: self.num_replicas]
 
         assert len(indices) == self.num_samples
 
-        rand_tensor = torch.multinomial(self.weights, self.num_samples, self.replacement, generator=self.generator)
+        rand_tensor = torch.multinomial(
+            self.weights, self.num_samples, self.replacement, generator=self.generator
+        )
         return iter(rand_tensor)
-

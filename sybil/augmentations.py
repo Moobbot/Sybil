@@ -1,11 +1,11 @@
+import random
+from abc import ABCMeta, abstractmethod
+from typing import Literal
+
 import cv2
+import numpy as np
 import torch
 import torchvision
-
-from typing import Literal
-from abc import ABCMeta, abstractmethod
-import numpy as np
-import random
 
 try:
     import albumentations as A
@@ -47,7 +47,8 @@ class Abstract_augmentation(object):
         self._trans_sep = "@"
         self._attr_sep = "#"
         self.name = (
-            self.__str__().split("sybil.augmentations.")[-1].split(" ")[0].lower()
+            self.__str__().split(
+                "sybil.augmentations.")[-1].split(" ")[0].lower()
         )
 
     @abstractmethod
@@ -117,9 +118,15 @@ class ResizeTransform:
     def __call__(self, image=None, mask=None):
         out = {"image": None, "mask": None}
         if image is not None:
-            out["image"] = cv2.resize(image, dsize=(self.width, self.height), interpolation=cv2.INTER_LINEAR)
+            out["image"] = cv2.resize(
+                image, dsize=(
+                    self.width, self.height), interpolation=cv2.INTER_LINEAR
+            )
         if mask is not None:
-            out["mask"] = cv2.resize(mask, dsize=(self.width, self.height), interpolation=cv2.INTER_NEAREST)
+            out["mask"] = cv2.resize(
+                mask, dsize=(
+                    self.width, self.height), interpolation=cv2.INTER_NEAREST
+            )
         return out
 
 
@@ -180,8 +187,10 @@ class Normalize_Tensor_2d(Abstract_augmentation):
     def __init__(self, args, kwargs):
         super(Normalize_Tensor_2d, self).__init__()
         assert len(kwargs) == 0
-        channel_means = [args.img_mean] if len(args.img_mean) == 1 else args.img_mean
-        channel_stds = [args.img_std] if len(args.img_std) == 1 else args.img_std
+        channel_means = [args.img_mean] if len(
+            args.img_mean) == 1 else args.img_mean
+        channel_stds = [args.img_std] if len(
+            args.img_std) == 1 else args.img_std
 
         self.transform = torchvision.transforms.Normalize(
             torch.Tensor(channel_means), torch.Tensor(channel_stds)
@@ -226,6 +235,7 @@ class Force_Num_Chan_Tensor_2d(Abstract_augmentation):
             img = img.unsqueeze(0)
         existing_chan = img.size()[0]
         if not existing_chan == self.args.num_chan:
-            input_dict["input"] = img.expand(self.args.num_chan, *img.size()[1:])
+            input_dict["input"] = img.expand(
+                self.args.num_chan, *img.size()[1:])
 
         return input_dict

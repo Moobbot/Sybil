@@ -1,9 +1,11 @@
+import copy
+from ast import literal_eval
+from collections import Counter
+
 import numpy as np
 from tqdm import tqdm
-from ast import literal_eval
+
 from sybil.datasets.nlst import NLST_Survival_Dataset
-from collections import Counter
-import copy
 
 DEVICE_ID = {
     "GE MEDICAL SYSTEMS": 0,
@@ -51,7 +53,8 @@ class MGH_Dataset(NLST_Survival_Dataset):
 
                 exam_no = self.get_exam_no(days_to_last_exam, exams)
 
-                y, y_seq, y_mask, time_at_event = self.get_label(exam_dict, exams)
+                y, y_seq, y_mask, time_at_event = self.get_label(
+                    exam_dict, exams)
 
                 for series_id, series_dict in exam_dict["image_series"].items():
 
@@ -59,7 +62,8 @@ class MGH_Dataset(NLST_Survival_Dataset):
                         continue
 
                     img_paths = series_dict["paths"]
-                    img_paths = [p.replace("Data082021", "pngs") for p in img_paths]
+                    img_paths = [p.replace("Data082021", "pngs")
+                                 for p in img_paths]
                     slice_locations = series_dict["image_posn"]
                     series_data = series_dict["series_data"]
                     device = DEVICE_ID[series_data["Manufacturer"]]
@@ -87,12 +91,15 @@ class MGH_Dataset(NLST_Survival_Dataset):
                         "series": series_id,
                         "pid": pid,
                         "device": device,
-                        "lung_rads": -1
-                        if exam_dict["lung_rads"] == np.nan
-                        else exam_dict["lung_rads"],
+                        "lung_rads": (
+                            -1
+                            if exam_dict["lung_rads"] == np.nan
+                            else exam_dict["lung_rads"]
+                        ),
                         "IV_contrast": exam_dict["IV_contrast"],
                         "lung_cancer_screening": exam_dict["lung_cancer_screening"],
-                        "cancer_location": np.zeros(14),  # mgh has no annotations
+                        # mgh has no annotations
+                        "cancer_location": np.zeros(14),
                         "cancer_laterality": np.zeros(
                             3, dtype=np.int
                         ),  # has to be int, while cancer_location has to be float
@@ -157,7 +164,8 @@ class MGH_Dataset(NLST_Survival_Dataset):
 
     def get_exam_no(self, diff_days, exams):
         """Gets the index of the exam, compared to the other exams"""
-        sorted_days = sorted([-exam["diff_days"] for exam in exams], reverse=True)
+        sorted_days = sorted([-exam["diff_days"]
+                             for exam in exams], reverse=True)
         return sorted_days.index(diff_days)
 
     def get_label(self, exam_dict, exams):
@@ -175,7 +183,8 @@ class MGH_Dataset(NLST_Survival_Dataset):
             time_at_event = min(years_to_cancer, self.args.max_followup - 1)
             y_seq[years_to_cancer:] = 1
         else:
-            time_at_event = min(years_to_last_followup, self.args.max_followup - 1)
+            time_at_event = min(years_to_last_followup,
+                                self.args.max_followup - 1)
 
         y_mask = np.array(
             [1] * (time_at_event + 1)
@@ -311,7 +320,8 @@ class MGH_Screening(NLST_Survival_Dataset):
         ]
         slice_locations = series_dict["slice_location"]
         series_data = series_dict["series_data"]
-        pixel_spacing = series_dict["PixelSpacing"] + [series_dict["SliceThickness"]]
+        pixel_spacing = series_dict["PixelSpacing"] + \
+            [series_dict["SliceThickness"]]
         sorted_img_paths, sorted_slice_locs = self.order_slices(
             img_paths, slice_locations, reverse=True
         )
@@ -358,11 +368,13 @@ class MGH_Screening(NLST_Survival_Dataset):
         }
 
         if self.args.use_risk_factors:
-            sample["risk_factors"] = self.get_risk_factors(exam_dict, return_dict=False)
+            sample["risk_factors"] = self.get_risk_factors(
+                exam_dict, return_dict=False)
 
         if self.args.use_annotations:
             # mgh has no annotations, so set everything to zero / false
-            sample["volume_annotations"] = np.array([0 for _ in sample["paths"]])
+            sample["volume_annotations"] = np.array(
+                [0 for _ in sample["paths"]])
             sample["annotations"] = [
                 {"image_annotations": None} for path in sample["paths"]
             ]
@@ -394,7 +406,8 @@ class MGH_Screening(NLST_Survival_Dataset):
                 time_at_event = self.args.max_followup - 1
             else:
                 days_to_last_neg_followup = exam_dict["days_to_last_follow_up"]
-                years_to_last_neg_followup = int(days_to_last_neg_followup // 365)
+                years_to_last_neg_followup = int(
+                    days_to_last_neg_followup // 365)
                 time_at_event = min(
                     years_to_last_neg_followup, self.args.max_followup - 1
                 )
