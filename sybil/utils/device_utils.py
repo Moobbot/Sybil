@@ -12,11 +12,11 @@ def get_default_device():
         # Not all operations implemented in MPS yet
         use_mps = os.environ.get("PYTORCH_ENABLE_MPS_FALLBACK", "0") == "1"
         if use_mps:
-            return torch.device('mps')
+            return torch.device("mps")
         else:
-            return torch.device('cpu')
+            return torch.device("cpu")
     else:
-        return torch.device('cpu')
+        return torch.device("cpu")
 
 
 def get_available_devices(num_devices=None, max_devices=None):
@@ -32,13 +32,19 @@ def get_available_devices(num_devices=None, max_devices=None):
         return gpu_list
     else:
         num_devices = num_devices if num_devices else torch.multiprocessing.cpu_count()
-        num_devices = min(num_devices, max_devices) if max_devices is not None else num_devices
-        return [device]*num_devices
+        num_devices = (
+            min(num_devices, max_devices) if max_devices is not None else num_devices
+        )
+        return [device] * num_devices
 
 
 def get_device(gpu_id: int):
-    if gpu_id is not None and torch.cuda.is_available() and gpu_id < torch.cuda.device_count():
-        return torch.device(f'cuda:{gpu_id}')
+    if (
+        gpu_id is not None
+        and torch.cuda.is_available()
+        and gpu_id < torch.cuda.device_count()
+    ):
+        return torch.device(f"cuda:{gpu_id}")
     else:
         return None
 
@@ -69,4 +75,4 @@ def get_most_free_gpu():
         if free_mem > most_free_val:
             most_free_idx, most_free_val = i, free_mem
 
-    return torch.device(f'cuda:{most_free_idx}')
+    return torch.device(f"cuda:{most_free_idx}")

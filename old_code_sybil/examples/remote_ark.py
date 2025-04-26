@@ -16,7 +16,6 @@ import numpy as np
 import requests
 
 import sybil.utils.visualization
-
 from utils import get_demo_data
 
 if __name__ == "__main__":
@@ -37,18 +36,24 @@ if __name__ == "__main__":
     # Check if the server is running and reachable
     resp = requests.get(f"{ark_host}/info")
     if resp.status_code != 200:
-        raise ValueError(f"Failed to connect to ARK server. Status code: {resp.status_code}")
+        raise ValueError(
+            f"Failed to connect to ARK server. Status code: {resp.status_code}"
+        )
 
     info_data = resp.json()["data"]
-    assert info_data["modelName"].lower() == "sybil", "The ARK server is not running Sybil"
+    assert (
+        info_data["modelName"].lower() == "sybil"
+    ), "The ARK server is not running Sybil"
     print(f"ARK server info: {info_data}")
 
     # Submit prediction to ARK server.
-    files = [('dicom', open(file_path, 'rb')) for file_path in dicom_files]
+    files = [("dicom", open(file_path, "rb")) for file_path in dicom_files]
     r = requests.post(f"{ark_host}/dicom/files", files=files, data=payload)
     _ = [f[1].close() for f in files]
     if r.status_code != 200:
-        raise ValueError(f"Error occurred processing DICOM files. Status code: {r.status_code}.\n{r.text}")
+        raise ValueError(
+            f"Error occurred processing DICOM files. Status code: {r.status_code}.\n{r.text}"
+        )
 
     r_json = r.json()
     predictions = r_json["data"]["predictions"]
@@ -66,12 +71,15 @@ if __name__ == "__main__":
     print(f"Writing attention images to {save_directory}")
 
     images = serie.get_raw_images()
-    overlayed_images = sybil.utils.visualization.build_overlayed_images(images, attentions, gain=3)
+    overlayed_images = sybil.utils.visualization.build_overlayed_images(
+        images, attentions, gain=3
+    )
 
     if save_directory is not None:
         serie_idx = 0
         save_path = os.path.join(save_directory, f"serie_{serie_idx}")
-        sybil.utils.visualization.save_images(overlayed_images, save_path, f"serie_{serie_idx}")
+        sybil.utils.visualization.save_images(
+            overlayed_images, save_path, f"serie_{serie_idx}"
+        )
 
     print(f"Finished writing attention images to {save_directory}")
-

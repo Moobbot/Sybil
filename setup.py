@@ -1,10 +1,10 @@
 import io
 import logging
-import platform
-import zipfile
 import os
-import subprocess
+import platform
 import re
+import subprocess
+import zipfile
 
 try:
     import requests

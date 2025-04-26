@@ -1,9 +1,10 @@
-from sybil.loaders.abstract_loader import abstract_loader
 import cv2
-import torch
-import pydicom
-from pydicom.pixel_data_handlers.util import apply_modality_lut
 import numpy as np
+import pydicom
+import torch
+from pydicom.pixel_data_handlers.util import apply_modality_lut
+
+from sybil.loaders.abstract_loader import abstract_loader
 
 LOADING_ERROR = "LOADING ERROR! {}"
 
@@ -23,7 +24,9 @@ class OpenCVLoader(abstract_loader):
 
 class DicomLoader(abstract_loader):
     def __init__(self, cache_path, augmentations, args, apply_augmentations=True):
-        super(DicomLoader, self).__init__(cache_path, augmentations, args, apply_augmentations)
+        super(DicomLoader, self).__init__(
+            cache_path, augmentations, args, apply_augmentations
+        )
         self.window_center = -600
         self.window_width = 1500
 
@@ -32,7 +35,7 @@ class DicomLoader(abstract_loader):
             dcm = pydicom.dcmread(path)
             dcm = apply_modality_lut(dcm.pixel_array, dcm)
             arr = apply_windowing(dcm, self.window_center, self.window_width)
-            arr = arr//256  # parity with images loaded as 8 bit
+            arr = arr // 256  # parity with images loaded as 8 bit
         except Exception:
             raise Exception(LOADING_ERROR.format("COULD NOT LOAD DICOM."))
         return {"input": arr}
@@ -58,7 +61,7 @@ def apply_windowing(image, center, width, bit_size=16):
         ndarray: Numpy array of transformed images
     """
     y_min = 0
-    y_max = 2 ** bit_size - 1
+    y_max = 2**bit_size - 1
     y_range = y_max - y_min
 
     c = center - 0.5

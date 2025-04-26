@@ -1,7 +1,8 @@
 import argparse
-import torch
 import os
 import pwd
+
+import torch
 from pytorch_lightning import Trainer
 
 EMPTY_NAME_ERR = 'Name of augmentation or one of its arguments cant be empty\n\
@@ -72,7 +73,8 @@ def parse_dispatcher_config(config):
 
             children = []
             if len(possible_values) == 0 or type(possible_values) is not list:
-                raise Exception(POSS_VAL_NOT_LIST.format(flag, possible_values))
+                raise Exception(POSS_VAL_NOT_LIST.format(
+                    flag, possible_values))
             for value in possible_values:
                 for parent_job in jobs:
                     if type(value) is bool:
@@ -86,7 +88,8 @@ def parse_dispatcher_config(config):
                             parent_job, flag, val_list_str
                         )
                     else:
-                        new_job_str = "{} --{} {}".format(parent_job, flag, value)
+                        new_job_str = "{} --{} {}".format(
+                            parent_job, flag, value)
                     children.append(new_job_str)
             jobs = children
 

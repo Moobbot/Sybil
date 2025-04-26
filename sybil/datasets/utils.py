@@ -1,5 +1,6 @@
-import numpy as np
 import math
+
+import numpy as np
 
 # Error Messages
 METAFILE_NOTFOUND_ERR = "Metadata file {} could not be parsed! Exception: {}!"
@@ -55,7 +56,8 @@ def get_scaled_annotation_mask(additional, args, scale_annotation=True):
 
         # pixels completely inside bounding box
         x_quant_left, y_quant_top = math.ceil(x_left), math.ceil(y_top)
-        x_quant_right, y_quant_bottom = math.floor(x_right), math.floor(y_bottom)
+        x_quant_right, y_quant_bottom = math.floor(
+            x_right), math.floor(y_bottom)
 
         # excess area along edges
         dx_left = x_quant_left - x_left
@@ -99,7 +101,7 @@ def get_scaled_annotation_area(sample, args):
     """
     areas = []
     for additional in sample["annotations"]:
-        mask = get_scaled_annotation_mask(additional, args, scale_annotation=False)
+        mask = get_scaled_annotation_mask(
+            additional, args, scale_annotation=False)
         areas.append(mask.sum() / (mask.shape[0] * mask.shape[1]))
     return np.array(areas)
-
