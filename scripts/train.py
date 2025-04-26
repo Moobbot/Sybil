@@ -1,20 +1,20 @@
-from collections import OrderedDict
-from argparse import Namespace
-import pickle
 import os
+import pickle
 import sys
+from argparse import Namespace
+from collections import OrderedDict
 
 import pytorch_lightning as pl
 import torch
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-from sybil.utils.helpers import get_dataset
+import sybil.models.sybil as model
+import sybil.utils.loading as loaders
 import sybil.utils.losses as losses
 import sybil.utils.metrics as metrics
-import sybil.utils.loading as loaders
-import sybil.models.sybil as model
 from sybil.parsing import parse_args
+from sybil.utils.helpers import get_dataset
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
 
 class SybilLightning(pl.LightningModule):
@@ -40,7 +40,7 @@ class SybilLightning(pl.LightningModule):
         self._list_of_metrics = [
             metrics.get_classification_metrics,
             metrics.get_survival_metrics,
-            metrics.get_risk_metrics
+            metrics.get_risk_metrics,
         ]
 
     def set_finetune(self, finetune_flag):
@@ -59,7 +59,8 @@ class SybilLightning(pl.LightningModule):
             predictions_dict["golds"] = batch["y"]
 
         if self.args.save_attention_scores:
-            attentions = {k: v for k, v in model_output.items() if "attention" in k}
+            attentions = {k: v for k, v in model_output.items()
+                          if "attention" in k}
             predictions_dict.update(attentions)
 
         loss_fns = self.get_loss_functions(self.args)
@@ -81,7 +82,8 @@ class SybilLightning(pl.LightningModule):
             batch, batch_idx, optimizer_idx, log_key_prefix="train_"
         )
         logging_dict["train_loss"] = loss.detach()
-        self.log_dict(logging_dict, prog_bar=False, on_step=True, on_epoch=True)
+        self.log_dict(logging_dict, prog_bar=False,
+                      on_step=True, on_epoch=True)
         result["logs"] = logging_dict
         self.log_tensor_dict(predictions_dict, prog_bar=False, logger=False)
         result.update(predictions_dict)
@@ -144,7 +146,7 @@ class SybilLightning(pl.LightningModule):
         self.log_dict(epoch_metrics, prog_bar=True, logger=True)
 
     def test_epoch_end(self, outputs):
-        self.save_prefix= 'test'
+        self.save_prefix = "test"
         if len(outputs) == 0:
             return
         outputs = gather_step_outputs(outputs)
@@ -159,13 +161,13 @@ class SybilLightning(pl.LightningModule):
 
         # Dump metrics for use by dispatcher
         metrics_dict = {
-            k[len(self.save_prefix) :]: v.mean().item()
+            k[len(self.save_prefix):]: v.mean().item()
             for k, v in outputs.items()
             if "loss" in k
         }
         metrics_dict.update(
             {
-                k[len(self.save_prefix) :]: v.mean().item()
+                k[len(self.save_prefix):]: v.mean().item()
                 for k, v in epoch_metrics.items()
             }
         )
@@ -187,7 +189,8 @@ class SybilLightning(pl.LightningModule):
         """
         Helper function to fetch optimizer based on args.
         """
-        params = [param for param in self.model.parameters() if param.requires_grad]
+        params = [param for param in self.model.parameters()
+                  if param.requires_grad]
         if self.args.optimizer == "adam":
             optimizer = torch.optim.Adam(
                 params, lr=self.args.lr, weight_decay=self.args.weight_decay
@@ -204,7 +207,8 @@ class SybilLightning(pl.LightningModule):
                 momentum=self.args.momentum,
             )
         else:
-            raise Exception("Optimizer {} not supported!".format(self.args.optimizer))
+            raise Exception(
+                "Optimizer {} not supported!".format(self.args.optimizer))
 
         scheduler = {
             "scheduler": torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -270,13 +274,16 @@ def gather_step_outputs(outputs):
 
     for k in outputs[-1].keys():
         if k == "logs":
-            output_dict[k] = gather_step_outputs([output["logs"] for output in outputs])
+            output_dict[k] = gather_step_outputs(
+                [output["logs"] for output in outputs])
         elif (
-            isinstance(outputs[-1][k], torch.Tensor) and len(outputs[-1][k].shape) == 0
+            isinstance(outputs[-1][k],
+                       torch.Tensor) and len(outputs[-1][k].shape) == 0
         ):
             output_dict[k] = torch.stack([output[k] for output in outputs])
         elif isinstance(outputs[-1][k], torch.Tensor):
-            output_dict[k] = torch.cat([output[k] for output in outputs], dim=0)
+            output_dict[k] = torch.cat([output[k]
+                                       for output in outputs], dim=0)
         else:
             output_dict[k] = [output[k] for output in outputs]
     return output_dict
@@ -314,14 +321,14 @@ def compute_epoch_metrics(list_of_metrics, result_dict, args, device, key_prefix
         if k == "meta":
             continue
         if key_prefix != "" and k.startswith(key_prefix):
-            k_wo_prefix = k[len(key_prefix) :]
+            k_wo_prefix = k[len(key_prefix):]
             result_dict_wo_key_prefix[k_wo_prefix] = v
         else:
             result_dict_wo_key_prefix[k] = v
 
     for k, v in result_dict["logs"].items():
         if k.startswith(key_prefix):
-            result_dict_wo_key_prefix[k[len(key_prefix) :]] = v
+            result_dict_wo_key_prefix[k[len(key_prefix):]] = v
 
     for metric_func in list_of_metrics:
         stats_wo_prefix = metric_func(result_dict_wo_key_prefix, args)
@@ -337,13 +344,17 @@ def train(args):
             dirpath=args.save_dir,
             save_top_k=1,
             verbose=True,
-            monitor="val_{}".format(args.tuning_metric)
-            if args.tuning_metric is not None
-            else None,
+            monitor=(
+                "val_{}".format(args.tuning_metric)
+                if args.tuning_metric is not None
+                else None
+            ),
             save_last=True,
-            mode="min"
-            if args.tuning_metric is not None and "loss" in args.tuning_metric
-            else "max",
+            mode=(
+                "min"
+                if args.tuning_metric is not None and "loss" in args.tuning_metric
+                else "max"
+            ),
         )
         args.callbacks = [checkpoint_callback]
     trainer = pl.Trainer.from_argparse_args(args)
@@ -362,7 +373,8 @@ def train(args):
         args, get_dataset(args.dataset, "dev", args), False
     )
 
-    args.censoring_distribution = metrics.get_censoring_dist(train_dataset.dataset)
+    args.censoring_distribution = metrics.get_censoring_dist(
+        train_dataset.dataset)
     module = SybilLightning(args)
 
     # print args
@@ -370,13 +382,16 @@ def train(args):
         print("{} -- {}".format(key.upper(), value))
 
     if args.snapshot is not None:
-        module = module.load_from_checkpoint(checkpoint_path= args.snapshot, strict=False)
+        module = module.load_from_checkpoint(
+            checkpoint_path=args.snapshot, strict=False
+        )
         module.args = args
-    
+
     trainer.fit(module, train_dataset, dev_dataset)
     args.model_path = trainer.checkpoint_callback.best_model_path
     print("Saving args to {}".format(args.results_path))
     pickle.dump(vars(args), open(args.results_path, "wb"))
+
 
 def test(args):
     trainer = pl.Trainer.from_argparse_args(args)
@@ -395,9 +410,11 @@ def test(args):
         args, get_dataset(args.dataset, "test", args), False
     )
 
-    args.censoring_distribution = metrics.get_censoring_dist(train_dataset.dataset)
+    args.censoring_distribution = metrics.get_censoring_dist(
+        train_dataset.dataset)
     module = SybilLightning(args)
-    module = module.load_from_checkpoint(checkpoint_path= args.snapshot, strict=False)
+    module = module.load_from_checkpoint(
+        checkpoint_path=args.snapshot, strict=False)
     module.args = args
 
     # print args
@@ -408,6 +425,7 @@ def test(args):
 
     print("Saving args to {}".format(args.results_path))
     pickle.dump(vars(args), open(args.results_path, "wb"))
+
 
 if __name__ == "__main__":
     args = parse_args()

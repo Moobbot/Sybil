@@ -1,14 +1,15 @@
-import torch
-import os
-import sys
-import os.path
-import warnings
-from sybil.datasets.utils import get_scaled_annotation_mask, IMG_PAD_TOKEN
-from sybil.augmentations import ComposeAug
-import numpy as np
-from abc import ABCMeta, abstractmethod
 import hashlib
+import os
+import os.path
+import sys
+import warnings
+from abc import ABCMeta, abstractmethod
 
+import numpy as np
+import torch
+
+from sybil.augmentations import ComposeAug
+from sybil.datasets.utils import IMG_PAD_TOKEN, get_scaled_annotation_mask
 
 CACHED_FILES_EXT = ".png"
 DEFAULT_CACHE_DIR = "default/"
@@ -51,7 +52,7 @@ def split_augmentations_by_cache(augmentations):
         else:
             key += trans.caching_keys()
             post_augmentations = (
-                augmentations[ind + 1 :] if ind < len(augmentations) else []
+                augmentations[ind + 1:] if ind < len(augmentations) else []
             )
             split_augmentations.append((key, post_augmentations))
 
@@ -139,7 +140,8 @@ class abstract_loader:
         if cache_path is not None:
             self.use_cache = True
             self.cache = cache(cache_path, self.cached_extension)
-            self.split_augmentations = split_augmentations_by_cache(augmentations)
+            self.split_augmentations = split_augmentations_by_cache(
+                augmentations)
         else:
             self.use_cache = False
             self.composed_all_augmentations = ComposeAug(augmentations)
@@ -172,7 +174,8 @@ class abstract_loader:
             input_dict = self.load_input(input_path)
             # hidden loaders typically do not use augmentation
             if self.apply_augmentations:
-                input_dict = self.composed_all_augmentations(input_dict, sample)
+                input_dict = self.composed_all_augmentations(
+                    input_dict, sample)
             return input_dict
 
         if self.args.use_annotations:
@@ -203,7 +206,8 @@ class abstract_loader:
                     print(e)
                     hashed_key = md5(input_path)
                     par_dir = self.cache._parent_dir(input_path)
-                    corrupted_file = self.cache._file_path(key, par_dir, hashed_key)
+                    corrupted_file = self.cache._file_path(
+                        key, par_dir, hashed_key)
                     warnings.warn(CORUPTED_FILE_ERR.format(sys.exc_info()[0]))
                     self.cache.rem(input_path, key)
         all_augmentations = self.split_augmentations[-1][1]

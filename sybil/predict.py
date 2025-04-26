@@ -1,5 +1,18 @@
 #!/usr/bin/env python
 
+import argparse
+import json
+import pickle
+import typing
+from typing import Literal
+
+from sybil import __version__
+from sybil.datasets import utils
+from sybil.model import Sybil
+from sybil.serie import Serie
+from sybil.utils import logging_utils
+from sybil.utils.visualization import visualize_attentions
+
 __doc__ = """
 Use Sybil to run inference on a single exam.
 """
@@ -8,20 +21,6 @@ import sys
 
 __dir__ = os.path.dirname(__file__)
 sys.path.append(os.path.join(__dir__, "../"))
-
-import argparse
-import json
-import os
-import pickle
-import typing
-from typing import Literal
-
-from sybil.utils import logging_utils
-from sybil.datasets import utils
-from sybil.serie import Serie
-from sybil.model import Sybil
-from sybil.utils.visualization import visualize_attentions
-from sybil import __version__
 
 
 def _get_parser():
@@ -86,7 +85,8 @@ def _get_parser():
         "Set to a negative number to use Pytorch default.",
     )
 
-    parser.add_argument("-v", "--version", action="version", version=__version__)
+    parser.add_argument("-v", "--version",
+                        action="version", version=__version__)
 
     return parser
 
@@ -133,14 +133,16 @@ def predict(
     logger.debug(
         f"Beginning prediction using {num_files} {file_type} files from {image_dir}"
     )
-    print(f"Beginning prediction using {num_files} {file_type} files from {image_dir}")
+    print(
+        f"Beginning prediction using {num_files} {file_type} files from {image_dir}")
 
     print("Load model")
     # Load a trained model
     model = Sybil(model_name)
     print("model loaded")
     # Get risk scores
-    serie = Serie(input_files, voxel_spacing=voxel_spacing, file_type=file_type)
+    serie = Serie(input_files, voxel_spacing=voxel_spacing,
+                  file_type=file_type)
     series = [serie]
     prediction = model.predict(
         series, return_attentions=return_attentions, threads=threads

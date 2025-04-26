@@ -6,19 +6,20 @@ import os
 import shutil
 import time
 import unittest
+import warnings
+import zipfile
 
 import numpy as np
 import requests
 import tqdm
-import warnings
-import zipfile
-
-warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import sybil.model
 import sybil.models.calibrator
 from sybil import Serie, Sybil, visualize_attentions
 from sybil.utils import device_utils
+
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
 PROJECT_DIR = os.path.dirname(script_directory)
@@ -68,7 +69,7 @@ def download_file(url, filename):
 
     # Check if the request was successful
     if response.status_code == 200:
-        with open(filename, 'wb') as file:
+        with open(filename, "wb") as file:
             file.write(response.content)
     else:
         print(f"Failed to download file. Status code: {response.status_code}")
@@ -84,13 +85,13 @@ def download_and_extract_zip(zip_file_name, cache_dir, url, demo_data_dir):
     if not os.path.exists(zip_file_path):
         # 2. Download the file
         response = requests.get(url)
-        with open(zip_file_path, 'wb') as file:
+        with open(zip_file_path, "wb") as file:
             file.write(response.content)
 
     # 3. Check if the output directory exists
     if not os.path.exists(demo_data_dir):
         # 4. Extract the zip file
-        with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+        with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
             zip_ref.extractall(demo_data_dir)
     else:
         pass
@@ -115,6 +116,7 @@ class TestPredict(unittest.TestCase):
     def test_demo_data(self):
         if not os.environ.get("SYBIL_TEST_RUN_REGRESSION", "false").lower() == "true":
             import pytest
+
             pytest.skip(f"Skipping long-running test in {type(self)}.")
 
         # Download demo data
@@ -125,7 +127,7 @@ class TestPredict(unittest.TestCase):
             0.07191945816622261,
             0.07926975188037134,
             0.09584583525781108,
-            0.13568094038444453
+            0.13568094038444453,
         ]
 
         zip_file_name = "sybil_example.zip"
@@ -133,7 +135,8 @@ class TestPredict(unittest.TestCase):
         demo_data_dir = os.path.join(cache_dir, "sybil_example")
         image_data_dir = os.path.join(demo_data_dir, "sybil_demo_data")
         os.makedirs(cache_dir, exist_ok=True)
-        download_and_extract_zip(zip_file_name, cache_dir, demo_data_url, demo_data_dir)
+        download_and_extract_zip(
+            zip_file_name, cache_dir, demo_data_url, demo_data_dir)
 
         dicom_files = os.listdir(image_data_dir)
         dicom_files = [os.path.join(image_data_dir, x) for x in dicom_files]
@@ -142,7 +145,8 @@ class TestPredict(unittest.TestCase):
         # Load a trained model
         model = Sybil()
 
-        myprint(f"Beginning prediction using {num_files} files from {image_data_dir}")
+        myprint(
+            f"Beginning prediction using {num_files} files from {image_data_dir}")
 
         # Get risk scores
         serie = Serie(dicom_files)
@@ -153,7 +157,9 @@ class TestPredict(unittest.TestCase):
 
         myprint(f"Prediction finished. Results\n{actual_scores}")
 
-        assert len(expected_scores) == len(actual_scores), f"Unexpected score length {count}"
+        assert len(expected_scores) == len(
+            actual_scores
+        ), f"Unexpected score length {count}"
 
         all_elements_match = True
         for exp_score, act_score in zip(expected_scores, actual_scores):
@@ -161,7 +167,9 @@ class TestPredict(unittest.TestCase):
             assert does_match, f"Mismatched scores. {exp_score} != {act_score}"
             all_elements_match &= does_match
 
-        print(f"Data URL: {demo_data_url}\nAll {count} elements match: {all_elements_match}")
+        print(
+            f"Data URL: {demo_data_url}\nAll {count} elements match: {all_elements_match}"
+        )
 
         series_with_attention = visualize_attentions(
             series,
@@ -180,7 +188,9 @@ def _get_nlst(series_instance_uid, cache_dir=".cache"):
     action = "getImage"
     remote_url = f"{base_url}/{action}"
     print(f"Downloading {series_instance_uid} from {remote_url}")
-    response = requests.get(remote_url, params={"SeriesInstanceUID": series_instance_uid})
+    response = requests.get(
+        remote_url, params={"SeriesInstanceUID": series_instance_uid}
+    )
     # The response is a zip file, I want to unzip it into a directory
     os.makedirs(series_dir, exist_ok=True)
 
@@ -200,6 +210,7 @@ class TestPredictionRegression(unittest.TestCase):
     def test_nlst_predict(self, allow_resume=True, delete_downloaded_files=False):
         if not os.environ.get("SYBIL_TEST_RUN_REGRESSION", "false").lower() == "true":
             import pytest
+
             pytest.skip(f"Skipping long-running test in {type(self)}.")
 
         test_series_list = test_series_uids.split("\n")
@@ -213,7 +224,8 @@ class TestPredictionRegression(unittest.TestCase):
 
         # True ->  send web requests to the ARK server (must be launched separately).
         # False -> to run inference directly.
-        use_ark = os.environ.get("SYBIL_TEST_USE_ARK", "false").lower() == "true"
+        use_ark = os.environ.get("SYBIL_TEST_USE_ARK",
+                                 "false").lower() == "true"
         ark_host = os.environ.get("SYBIL_ARK_HOST", "http://localhost:5000")
 
         version = sybil.__version__
@@ -232,12 +244,12 @@ class TestPredictionRegression(unittest.TestCase):
         output_dir = os.path.join(PROJECT_DIR, "tests", "nlst_predictions")
 
         metadata = {
-                "modelName": model_name,
-                "modelVersion": version,
-                "start_time": datetime.datetime.now().isoformat(),
-            }
+            "modelName": model_name,
+            "modelVersion": version,
+            "start_time": datetime.datetime.now().isoformat(),
+        }
         metadata.update(info_data)
-        all_results = {"__metadata__":  metadata}
+        all_results = {"__metadata__": metadata}
 
         os.makedirs(output_dir, exist_ok=True)
         cur_pred_results = os.path.join(output_dir, out_fi_name)
@@ -245,7 +257,7 @@ class TestPredictionRegression(unittest.TestCase):
 
         if os.path.exists(cur_pred_results):
             if allow_resume:
-                with open(cur_pred_results, 'r') as f:
+                with open(cur_pred_results, "r") as f:
                     all_results = json.load(f)
             else:
                 os.remove(cur_pred_results)
@@ -261,28 +273,39 @@ class TestPredictionRegression(unittest.TestCase):
 
         num_to_process = len(test_series_list)
         for idx, series_uid in enumerate(tqdm.tqdm(test_series_list)):
-            print(f"{datetime.datetime.now()} Processing {series_uid} ({idx}/{num_to_process})")
+            print(
+                f"{datetime.datetime.now()} Processing {series_uid} ({idx}/{num_to_process})"
+            )
             if series_uid in all_results:
                 print(f"Already processed {series_uid}, skipping")
                 continue
 
             series_dir = _get_nlst(series_uid, cache_dir=cache_dir)
             dicom_files = os.listdir(series_dir)
-            dicom_files = sorted([os.path.join(series_dir, x) for x in dicom_files if x.endswith(".dcm")])
+            dicom_files = sorted(
+                [os.path.join(series_dir, x)
+                 for x in dicom_files if x.endswith(".dcm")]
+            )
 
             if len(dicom_files) < 20:
-                print(f"Skipping {series_uid} due to insufficient files ({len(dicom_files)})")
+                print(
+                    f"Skipping {series_uid} due to insufficient files ({len(dicom_files)})"
+                )
                 continue
 
             try:
                 prediction = all_results.get(series_uid, {})
                 if use_ark:
                     # Submit prediction to ARK server.
-                    files = [('dicom', open(file_path, 'rb')) for file_path in dicom_files]
+                    files = [
+                        ("dicom", open(file_path, "rb")) for file_path in dicom_files
+                    ]
                     r = requests.post(f"{ark_host}/dicom/files", files=files)
                     _ = [f[1].close() for f in files]
                     if r.status_code != 200:
-                        print(f"An error occurred while processing {series_uid}: {r.text}")
+                        print(
+                            f"An error occurred while processing {series_uid}: {r.text}"
+                        )
                         prediction["error"] = r.text
                         continue
                     else:
@@ -293,7 +316,8 @@ class TestPredictionRegression(unittest.TestCase):
                 else:
                     serie = Serie(dicom_files)
                     start_time = time.time()
-                    pred_result = model.predict([serie], return_attentions=False)
+                    pred_result = model.predict(
+                        [serie], return_attentions=False)
                     runtime = "{:.2f}s".format(time.time() - start_time)
 
                     scores = pred_result.scores
@@ -317,35 +341,53 @@ class TestPredictionRegression(unittest.TestCase):
             all_results[series_uid] = cur_dict
 
             # Save as we go
-            with open(cur_pred_results, 'w') as f:
+            with open(cur_pred_results, "w") as f:
                 json.dump(all_results, f, indent=2)
 
     def test_compare_predict_scores(self):
         if not os.environ.get("SYBIL_TEST_RUN_REGRESSION", "false").lower() == "true":
             import pytest
+
             pytest.skip(f"Skipping long-running test '{type(self)}'.")
 
-        default_baseline_preds_path = os.path.join(PROJECT_DIR, "tests",
-                                                   "nlst_predictions", "nlst_predictions_ark_v1.4.0.json")
-        baseline_preds_path = os.environ.get("SYBIL_TEST_BASELINE_PATH", default_baseline_preds_path)
+        default_baseline_preds_path = os.path.join(
+            PROJECT_DIR, "tests", "nlst_predictions", "nlst_predictions_ark_v1.4.0.json"
+        )
+        baseline_preds_path = os.environ.get(
+            "SYBIL_TEST_BASELINE_PATH", default_baseline_preds_path
+        )
 
         version = sybil.__version__
-        default_new_preds_path = os.path.join(PROJECT_DIR, "tests",
-                                                "nlst_predictions", f"nlst_predictions_sybil_ensemble_v{version}.json")
-        new_preds_path = os.environ.get("SYBIL_TEST_COMPARE_PATH", default_new_preds_path)
-        assert new_preds_path, "SYBIL_TEST_COMPARE_PATH must be set to the path of the new predictions file."
+        default_new_preds_path = os.path.join(
+            PROJECT_DIR,
+            "tests",
+            "nlst_predictions",
+            f"nlst_predictions_sybil_ensemble_v{version}.json",
+        )
+        new_preds_path = os.environ.get(
+            "SYBIL_TEST_COMPARE_PATH", default_new_preds_path
+        )
+        assert (
+            new_preds_path
+        ), "SYBIL_TEST_COMPARE_PATH must be set to the path of the new predictions file."
         pred_key = "predictions"
         num_compared = 0
 
-        with open(baseline_preds_path, 'r') as f:
+        with open(baseline_preds_path, "r") as f:
             baseline_preds = json.load(f)
-        with open(new_preds_path, 'r') as f:
+        with open(new_preds_path, "r") as f:
             new_preds = json.load(f)
 
         ignore_keys = {"__metadata__"}
-        overlap_keys = set(baseline_preds.keys()).intersection(new_preds.keys()) - ignore_keys
-        union_keys = set(baseline_preds.keys()).union(new_preds.keys()) - ignore_keys
-        print(f"{len(overlap_keys)} / {len(union_keys)} patients in common between the two prediction files.")
+        overlap_keys = (
+            set(baseline_preds.keys()).intersection(
+                new_preds.keys()) - ignore_keys
+        )
+        union_keys = set(baseline_preds.keys()).union(
+            new_preds.keys()) - ignore_keys
+        print(
+            f"{len(overlap_keys)} / {len(union_keys)} patients in common between the two prediction files."
+        )
 
         all_mismatches = []
         for series_uid_key in overlap_keys:
@@ -353,7 +395,9 @@ class TestPredictionRegression(unittest.TestCase):
                 continue
 
             if pred_key not in baseline_preds[series_uid_key]:
-                print(f"{pred_key} not found in baseline predictions for {series_uid_key}")
+                print(
+                    f"{pred_key} not found in baseline predictions for {series_uid_key}"
+                )
                 assert pred_key not in new_preds[series_uid_key]
                 continue
 
@@ -365,7 +409,8 @@ class TestPredictionRegression(unittest.TestCase):
                     year = ind + 1
                     baseline_score = cur_baseline_preds[ind]
                     new_score = cur_new_preds[ind]
-                    does_match = math.isclose(baseline_score, new_score, abs_tol=1e-6)
+                    does_match = math.isclose(
+                        baseline_score, new_score, abs_tol=1e-6)
                     if not does_match:
                         err_str = f"Scores for {series_uid_key}, {comp_key} differ for year {year}.\n"
                         err_str += f"Diff: {new_score - baseline_score:0.4e}. Baseline: {baseline_score:0.4e}, New: {new_score:0.4e}"
@@ -382,43 +427,62 @@ class TestPredictionRegression(unittest.TestCase):
                 print(err)
 
         num_mismatches = len(all_mismatches)
-        assert num_mismatches == 0, f"Found {num_mismatches} mismatches between the two prediction files."
+        assert (
+            num_mismatches == 0
+        ), f"Found {num_mismatches} mismatches between the two prediction files."
 
     def test_calibrator(self):
         """
         Test the calibrator against previous known calibrations.
         """
 
-        default_baseline_path = os.path.join(PROJECT_DIR, "tests", "sybil_ensemble_v1.4.0_calibrations.json")
-        baseline_path = os.environ.get("SYBIL_TEST_BASELINE_PATH", default_baseline_path)
+        default_baseline_path = os.path.join(
+            PROJECT_DIR, "tests", "sybil_ensemble_v1.4.0_calibrations.json"
+        )
+        baseline_path = os.environ.get(
+            "SYBIL_TEST_BASELINE_PATH", default_baseline_path
+        )
 
         if not os.path.exists(baseline_path) and baseline_path == default_baseline_path:
             os.makedirs(os.path.dirname(default_baseline_path), exist_ok=True)
             reference_calibrations_url = "https://www.dropbox.com/scl/fi/2fx6ukmozia7y3u8mie97/sybil_ensemble_v1.4.0_calibrations.json?rlkey=tquids9qo4mkkuf315nqdq0o7&dl=1"
             download_file(reference_calibrations_url, default_baseline_path)
 
-        default_cal_dict_path = os.path.expanduser("~/.sybil/sybil_ensemble_simple_calibrator.json")
-        compare_calibrator_path = os.environ.get("SYBIL_TEST_COMPARE_PATH", default_cal_dict_path)
+        default_cal_dict_path = os.path.expanduser(
+            "~/.sybil/sybil_ensemble_simple_calibrator.json"
+        )
+        compare_calibrator_path = os.environ.get(
+            "SYBIL_TEST_COMPARE_PATH", default_cal_dict_path
+        )
         compare_calibrator_path = os.path.expanduser(compare_calibrator_path)
-        if not os.path.exists(compare_calibrator_path) and compare_calibrator_path == default_cal_dict_path:
+        if (
+            not os.path.exists(compare_calibrator_path)
+            and compare_calibrator_path == default_cal_dict_path
+        ):
             test_model = Sybil("sybil_ensemble")
 
         with open(compare_calibrator_path, "r") as f:
             raw_calibrator_dict = json.load(f)
         new_calibrator_dict = {}
         for key, val in raw_calibrator_dict.items():
-            new_calibrator_dict[key] = sybil.models.calibrator.SimpleClassifierGroup.from_json(val)
+            new_calibrator_dict[key] = (
+                sybil.models.calibrator.SimpleClassifierGroup.from_json(val)
+            )
 
         with open(baseline_path, "r") as f:
             baseline_preds = json.load(f)
         test_probs = np.array(baseline_preds["x"]).reshape(-1, 1)
-        year_keys = [key for key in baseline_preds.keys() if key.startswith("Year")]
+        year_keys = [key for key in baseline_preds.keys()
+                     if key.startswith("Year")]
         for year_key in year_keys:
             baseline_scores = np.array(baseline_preds[year_key]).flatten()
             new_cal = new_calibrator_dict[year_key]
             new_scores = new_cal.predict_proba(test_probs).flatten()
 
-            self.assertTrue(np.allclose(baseline_scores, new_scores, atol=1e-10), f"Calibration mismatch for {year_key}")
+            self.assertTrue(
+                np.allclose(baseline_scores, new_scores, atol=1e-10),
+                f"Calibration mismatch for {year_key}",
+            )
 
 
 if __name__ == "__main__":

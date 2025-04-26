@@ -1,24 +1,24 @@
+import copy
+import json
 import os
+import pickle
+import traceback
+import warnings
+from collections import Counter
 from posixpath import split
-import traceback, warnings
-import pickle, json
+
 import numpy as np
 import pydicom
-import torchio as tio
-from tqdm import tqdm
-from collections import Counter
 import torch
 import torch.nn.functional as F
+import torchio as tio
 from torch.utils import data
+from tqdm import tqdm
+
+from sybil.datasets.nlst_risk_factors import NLSTRiskFactorVectorizer
+from sybil.datasets.utils import LOAD_FAIL_MSG, METAFILE_NOTFOUND_ERR, VOXEL_SPACING
 from sybil.serie import Serie
 from sybil.utils.loading import get_sample_loader
-from sybil.datasets.utils import (
-    METAFILE_NOTFOUND_ERR,
-    LOAD_FAIL_MSG,
-    VOXEL_SPACING,
-)
-import copy
-from sybil.datasets.nlst_risk_factors import NLSTRiskFactorVectorizer
 
 METADATA_FILENAME = {"google_test": "NLST/full_nlst_google.json"}
 
@@ -81,7 +81,8 @@ class NLST_Survival_Dataset(data.Dataset):
         try:
             self.metadata_json = json.load(open(args.dataset_file_path, "r"))
         except Exception as e:
-            raise Exception(METAFILE_NOTFOUND_ERR.format(args.dataset_file_path, e))
+            raise Exception(METAFILE_NOTFOUND_ERR.format(
+                args.dataset_file_path, e))
 
         self.input_loader = get_sample_loader(split_group, args)
         self.always_resample_pixel_spacing = split_group in ["dev", "test"]
@@ -161,13 +162,15 @@ class NLST_Survival_Dataset(data.Dataset):
                 elif split == "test":
                     google_series = list(self.GOOGLE_SPLITS[pid]["exams"])
                     nlst_series = list(exam_dict["image_series"].keys())
-                    thinnest_series_id = [s for s in nlst_series if s in google_series]
+                    thinnest_series_id = [
+                        s for s in nlst_series if s in google_series]
                     assert len(thinnest_series_id) < 2
                     if len(thinnest_series_id) > 0:
                         thinnest_series_id = thinnest_series_id[0]
                     elif len(thinnest_series_id) == 0:
                         if self.args.assign_splits:
-                            thinnest_series_id = self.get_thinnest_cut(exam_dict)
+                            thinnest_series_id = self.get_thinnest_cut(
+                                exam_dict)
                         else:
                             continue
 
@@ -232,12 +235,14 @@ class NLST_Survival_Dataset(data.Dataset):
 
         # invalid label
         if not bad_label:
-            y, _, _, time_at_event = self.get_label(pt_metadata, screen_timepoint)
+            y, _, _, time_at_event = self.get_label(
+                pt_metadata, screen_timepoint)
             invalid_label = (y == -1) or (time_at_event < 0)
         else:
             invalid_label = False
 
-        insufficient_slices = len(series_dict["paths"]) < self.args.min_num_images
+        insufficient_slices = len(
+            series_dict["paths"]) < self.args.min_num_images
 
         if (
             is_localizer
@@ -266,17 +271,20 @@ class NLST_Survival_Dataset(data.Dataset):
                     [path not in self.corrupted_paths for path in img_paths]
                 )[0]
                 img_paths = np.array(img_paths)[uncorrupted_imgs].tolist()
-                slice_locations = np.array(slice_locations)[uncorrupted_imgs].tolist()
+                slice_locations = np.array(slice_locations)[
+                    uncorrupted_imgs].tolist()
 
         sorted_img_paths, sorted_slice_locs = self.order_slices(
             img_paths, slice_locations
         )
 
-        y, y_seq, y_mask, time_at_event = self.get_label(pt_metadata, screen_timepoint)
+        y, y_seq, y_mask, time_at_event = self.get_label(
+            pt_metadata, screen_timepoint)
 
         exam_int = int(
             "{}{}{}".format(
-                int(pid), int(screen_timepoint), int(series_id.split(".")[-1][-3:])
+                int(pid), int(screen_timepoint), int(
+                    series_id.split(".")[-1][-3:])
             )
         )
         sample = {
@@ -326,7 +334,8 @@ class NLST_Survival_Dataset(data.Dataset):
         years_to_cancer = (
             int(days_to_cancer // 365) if days_to_cancer_since_rand > -1 else 100
         )
-        days_to_last_followup = int(pt_metadata["fup_days"][0] - days_since_rand)
+        days_to_last_followup = int(
+            pt_metadata["fup_days"][0] - days_since_rand)
         years_to_last_followup = days_to_last_followup // 365
         y = years_to_cancer < self.args.max_followup
         y_seq = np.zeros(self.args.max_followup)
@@ -337,7 +346,8 @@ class NLST_Survival_Dataset(data.Dataset):
             time_at_event = years_to_cancer
             y_seq[years_to_cancer:] = 1
         else:
-            time_at_event = min(years_to_last_followup, self.args.max_followup - 1)
+            time_at_event = min(years_to_last_followup,
+                                self.args.max_followup - 1)
         y_mask = np.array(
             [1] * (time_at_event + 1)
             + [0] * (self.args.max_followup - (time_at_event + 1))
@@ -379,7 +389,7 @@ class NLST_Survival_Dataset(data.Dataset):
         if not sorted_img_paths[0].startswith(self.args.img_dir):
             sorted_img_paths = [
                 self.args.img_dir
-                + path[path.find("nlst-ct-png") + len("nlst-ct-png") :]
+                + path[path.find("nlst-ct-png") + len("nlst-ct-png"):]
                 for path in sorted_img_paths
             ]
         if (
@@ -394,7 +404,8 @@ class NLST_Survival_Dataset(data.Dataset):
 
     def get_risk_factors(self, pt_metadata, screen_timepoint, return_dict=False):
         age_at_randomization = pt_metadata["age"][0]
-        days_since_randomization = pt_metadata["scr_days{}".format(screen_timepoint)][0]
+        days_since_randomization = pt_metadata["scr_days{}".format(
+            screen_timepoint)][0]
         current_age = age_at_randomization + days_since_randomization // 365
 
         age_start_smoking = pt_metadata["smokeage"][0]
@@ -435,9 +446,11 @@ class NLST_Survival_Dataset(data.Dataset):
             "cancthyr",
             "canctran",
         ]
-        cancer_hx = any([pt_metadata[key][0] == 1 for key in prior_cancer_keys])
+        cancer_hx = any(
+            [pt_metadata[key][0] == 1 for key in prior_cancer_keys])
         family_hx = any(
-            [pt_metadata[key][0] == 1 for key in pt_metadata if key.startswith("fam")]
+            [pt_metadata[key][0] ==
+                1 for key in pt_metadata if key.startswith("fam")]
         )
 
         risk_factors = {
@@ -480,11 +493,13 @@ class NLST_Survival_Dataset(data.Dataset):
         institutions = set([m["pt_metadata"]["cen"][0] for m in meta])
         institutions = sorted(institutions)
         institute_to_split = {
-            cen: np.random.choice(["train", "dev", "test"], p=self.args.split_probs)
+            cen: np.random.choice(
+                ["train", "dev", "test"], p=self.args.split_probs)
             for cen in institutions
         }
         for idx in range(len(meta)):
-            meta[idx]["split"] = institute_to_split[meta[idx]["pt_metadata"]["cen"][0]]
+            meta[idx]["split"] = institute_to_split[meta[idx]
+                                                    ["pt_metadata"]["cen"][0]]
 
     @property
     def METADATA_FILENAME(self):
@@ -565,7 +580,8 @@ class NLST_Survival_Dataset(data.Dataset):
             if self.args.use_annotations:
                 mask = torch.abs(input_dict["mask"])
                 mask_area = mask.sum(dim=(-1, -2))
-                item["volume_annotations"] = mask_area[0] / max(1, mask_area.sum())
+                item["volume_annotations"] = mask_area[0] / \
+                    max(1, mask_area.sum())
                 item["annotation_areas"] = mask_area[0] / (
                     mask.shape[-2] * mask.shape[-1]
                 )
@@ -585,7 +601,8 @@ class NLST_Survival_Dataset(data.Dataset):
 
             return item
         except Exception:
-            warnings.warn(LOAD_FAIL_MSG.format(sample["exam"], traceback.print_exc()))
+            warnings.warn(LOAD_FAIL_MSG.format(
+                sample["exam"], traceback.print_exc()))
 
     def get_images(self, paths, sample):
         """
@@ -609,7 +626,8 @@ class NLST_Survival_Dataset(data.Dataset):
         input_arr = self.reshape_images(images)
         if self.args.use_annotations:
             masks = [i["mask"] for i in input_dicts]
-            mask_arr = self.reshape_images(masks) if self.args.use_annotations else None
+            mask_arr = self.reshape_images(
+                masks) if self.args.use_annotations else None
 
         # resample pixel spacing
         resample_now = self.args.resample_pixel_spacing_prob > np.random.uniform()
@@ -665,11 +683,13 @@ class NLST_for_PLCO(NLST_Survival_Dataset):
         screen_timepoint = series_data["study_yr"][0]
         assert screen_timepoint == exam_dict["screen_timepoint"]
 
-        y, y_seq, y_mask, time_at_event = self.get_label(pt_metadata, screen_timepoint)
+        y, y_seq, y_mask, time_at_event = self.get_label(
+            pt_metadata, screen_timepoint)
 
         exam_int = int(
             "{}{}{}".format(
-                int(pid), int(screen_timepoint), int(series_id.split(".")[-1][-3:])
+                int(pid), int(screen_timepoint), int(
+                    series_id.split(".")[-1][-3:])
             )
         )
 
@@ -677,7 +697,8 @@ class NLST_for_PLCO(NLST_Survival_Dataset):
             pt_metadata, screen_timepoint, return_dict=True
         )
 
-        riskfactors["education"] = EDUCAT_LEVEL.get(riskfactors["education"], -1)
+        riskfactors["education"] = EDUCAT_LEVEL.get(
+            riskfactors["education"], -1)
         riskfactors["race"] = RACE_ID_KEYS.get(pt_metadata["race"][0], -1)
 
         sample = {
@@ -725,9 +746,11 @@ class NLST_for_PLCO_Screening(NLST_for_PLCO):
             if len(pid2lungrads[d["pid"]]) < 3:
                 continue
             is_third_screen = d["screen_timepoint"] == 2
-            is_1yr_ca_free = (d["y"] and d["time_at_event"] > 0) or (not d["y"])
+            is_1yr_ca_free = (d["y"] and d["time_at_event"]
+                              > 0) or (not d["y"])
             if is_third_screen and is_1yr_ca_free:
-                d["scr_group_coef"] = self.get_screening_group(pid2lungrads[d["pid"]])
+                d["scr_group_coef"] = self.get_screening_group(
+                    pid2lungrads[d["pid"]])
                 for k in ["age", "years_since_quit_smoking", "smoking_duration"]:
                     d[k] = d[k] + 1
                 plco_results_dataset.append(d)

@@ -1,29 +1,30 @@
+import json
 import os
 import pickle
 import typing
 import urllib
 import zipfile
-import json
-from flask import logging
-import numpy as np
-from typing import Literal, Dict
+from typing import Dict, Literal
 
+import numpy as np
 import pydicom
+from flask import logging
+
 from config import (
+    CALIBRATOR_PATH,
     CHECKPOINT_DIR,
     CHECKPOINT_URL,
     MODEL_CONFIG,
     MODEL_PATHS,
-    CALIBRATOR_PATH,
     PREDICTION_CONFIG,
-    VISUALIZATION_CONFIG as cfg,
 )
+from config import VISUALIZATION_CONFIG as cfg
 from sybil.datasets import utils as utils_datasets
 from sybil.model import Sybil
 from sybil.serie import Serie
 from sybil.utils import logging_utils
-from sybil.utils.visualization import visualize_attentions, rank_images_by_attention
 from sybil.utils.config import VISUALIZATION_CONFIG as vsl_config
+from sybil.utils.visualization import rank_images_by_attention, visualize_attentions
 
 
 def download_checkpoints():
@@ -59,7 +60,8 @@ def load_model(model_name="sybil_ensemble"):
 
     print("Loading Sybil model...")
     try:
-        model = Sybil(name_or_path=MODEL_PATHS, calibrator_path=CALIBRATOR_PATH)
+        model = Sybil(name_or_path=MODEL_PATHS,
+                      calibrator_path=CALIBRATOR_PATH)
     except:
         model = Sybil(model_name)
     print("Model loaded successfully.")
@@ -203,10 +205,12 @@ def process_attention_scores(
                 if parts and parts[-1].isdigit():
                     patient_name = "_".join(parts[:-1])
                     # Create prediction filename using the reversed index
-                    pred_filename = f"{vsl_config['FILE_NAMING']['PREDICTION_PREFIX']}{patient_name}_{reversed_idx:0{num_digits}d}.{file_type}"  # Use .png or .dcm as needed
+                    # Use .png or .dcm as needed
+                    pred_filename = f"{vsl_config['FILE_NAMING']['PREDICTION_PREFIX']}{patient_name}_{reversed_idx:0{num_digits}d}.{file_type}"
                 else:
                     patient_name = base_name
-                    pred_filename = f"{vsl_config['FILE_NAMING']['PREDICTION_PREFIX']}{patient_name}_{reversed_idx:0{num_digits}d}.{file_type}"  # Use .png or .dcm as needed
+                    # Use .png or .dcm as needed
+                    pred_filename = f"{vsl_config['FILE_NAMING']['PREDICTION_PREFIX']}{patient_name}_{reversed_idx:0{num_digits}d}.{file_type}"
 
                 attention_scores.append(
                     {
@@ -271,7 +275,8 @@ def predict(
     # Determine file type
     file_type, voxel_spacing = determine_file_type(input_files, image_dir)
 
-    logger.debug(f"Processing {len(input_files)} {file_type} files from {image_dir}")
+    logger.debug(
+        f"Processing {len(input_files)} {file_type} files from {image_dir}")
 
     assert file_type in {"dicom", "png"}
     file_type = typing.cast(typing.Literal["dicom", "png"], file_type)
@@ -281,7 +286,8 @@ def predict(
         model = load_model()
 
     # Create Serie and get predictions
-    serie = Serie(input_files, voxel_spacing=voxel_spacing, file_type=file_type)
+    serie = Serie(input_files, voxel_spacing=voxel_spacing,
+                  file_type=file_type)
     prediction = model.predict(
         [serie], return_attentions=return_attentions, threads=threads
     )
@@ -303,7 +309,8 @@ def predict(
     if file_type == "dicom":
         dicom_metadata_list = [pydicom.dcmread(f) for f in input_files]
         if not dicom_metadata_list:
-            logging.warning("⚠️ No DICOM metadata could be loaded from input files")
+            logging.warning(
+                "⚠️ No DICOM metadata could be loaded from input files")
 
     # Process attention scores if requested
     if return_attentions:
@@ -311,7 +318,8 @@ def predict(
         with open(attention_path, "wb") as f:
             pickle.dump(prediction, f)
 
-        attention_info = process_attention_scores(prediction, serie, input_files)
+        attention_info = process_attention_scores(
+            prediction, serie, input_files)
 
         # Save rankings
         ranking_path = PREDICTION_CONFIG["RANKING_PATH"]

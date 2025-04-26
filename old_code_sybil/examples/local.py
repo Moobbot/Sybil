@@ -6,7 +6,6 @@ Simple example script showing how to use the Sybil library locally to predict ri
 
 import sybil
 from sybil import visualize_attentions
-
 from utils import get_demo_data
 
 
@@ -36,6 +35,7 @@ def main():
     )
 
     print(f"Finished writing attention images to {output_dir}")
+
 
 if __name__ == "__main__":
     main()

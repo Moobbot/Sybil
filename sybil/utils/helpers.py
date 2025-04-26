@@ -1,6 +1,6 @@
-from sybil.datasets.validation import CSVDataset
-from sybil.datasets.nlst import *
 from sybil.datasets.mgh import MGH_Screening
+from sybil.datasets.nlst import *
+from sybil.datasets.validation import CSVDataset
 
 SUPPORTED_DATASETS = {
     "validation": CSVDataset,
@@ -14,5 +14,6 @@ SUPPORTED_DATASETS = {
 
 def get_dataset(dataset_name, split, args):
     if dataset_name not in SUPPORTED_DATASETS:
-        raise NotImplementedError("Dataset {} does not exist.".format(dataset_name))
+        raise NotImplementedError(
+            "Dataset {} does not exist.".format(dataset_name))
     return SUPPORTED_DATASETS[dataset_name](args, split)
