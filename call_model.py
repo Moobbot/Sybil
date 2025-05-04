@@ -1,29 +1,30 @@
+import json
 import os
 import pickle
 import typing
 import urllib
 import zipfile
-import json
-from flask import logging
-import numpy as np
-from typing import Literal, Dict
+from typing import Dict, Literal
 
+import numpy as np
 import pydicom
+from flask import logging
+
 from config import (
+    CALIBRATOR_PATH,
     CHECKPOINT_DIR,
     CHECKPOINT_URL,
     MODEL_CONFIG,
     MODEL_PATHS,
-    CALIBRATOR_PATH,
     PREDICTION_CONFIG,
-    VISUALIZATION_CONFIG as cfg,
 )
+from config import VISUALIZATION_CONFIG as cfg
 from sybil.datasets import utils as utils_datasets
 from sybil.model import Sybil
 from sybil.serie import Serie
 from sybil.utils import logging_utils
-from sybil.utils.visualization import visualize_attentions, rank_images_by_attention
 from sybil.utils.config import VISUALIZATION_CONFIG as vsl_config
+from sybil.utils.visualization import rank_images_by_attention, visualize_attentions
 
 
 def download_checkpoints():
@@ -203,10 +204,12 @@ def process_attention_scores(
                 if parts and parts[-1].isdigit():
                     patient_name = "_".join(parts[:-1])
                     # Create prediction filename using the reversed index
-                    pred_filename = f"{vsl_config['FILE_NAMING']['PREDICTION_PREFIX']}{patient_name}_{reversed_idx:0{num_digits}d}.{file_type}"  # Use .png or .dcm as needed
+                    # Use .png or .dcm as needed
+                    pred_filename = f"{vsl_config['FILE_NAMING']['PREDICTION_PREFIX']}{patient_name}_{reversed_idx:0{num_digits}d}.{file_type}"
                 else:
                     patient_name = base_name
-                    pred_filename = f"{vsl_config['FILE_NAMING']['PREDICTION_PREFIX']}{patient_name}_{reversed_idx:0{num_digits}d}.{file_type}"  # Use .png or .dcm as needed
+                    # Use .png or .dcm as needed
+                    pred_filename = f"{vsl_config['FILE_NAMING']['PREDICTION_PREFIX']}{patient_name}_{reversed_idx:0{num_digits}d}.{file_type}"
 
                 attention_scores.append(
                     {
@@ -302,13 +305,15 @@ def predict(
     dicom_metadata_list = []
     if file_type == "dicom":
         # First, load all DICOM metadata
-        dicom_metadata_dict = {os.path.normpath(f): pydicom.dcmread(f) for f in input_files}
-        
+        dicom_metadata_dict = {
+            os.path.normpath(f): pydicom.dcmread(f) for f in input_files
+        }
+
         # Then, reorder according to the serie's ordered paths
         # This ensures dicom_metadata_list matches the order of images in serie
         ordered_paths = [os.path.normpath(path) for path in serie._meta.paths]
         dicom_metadata_list = [dicom_metadata_dict[path] for path in ordered_paths]
-        
+
         if not dicom_metadata_list:
             logging.warning("⚠️ No DICOM metadata could be loaded from input files")
 
