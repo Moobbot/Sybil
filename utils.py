@@ -1,15 +1,17 @@
 import base64
 import io
 import os
-import time
 import shutil
 import socket
+import time
 import zipfile
-from flask import jsonify
+
 import numpy as np
 import pydicom
+from flask import jsonify
 from PIL import Image
 from werkzeug.utils import secure_filename
+
 from config import PREDICTION_CONFIG, PYTHON_ENV, RESULTS_FOLDER, UPLOAD_FOLDER
 
 

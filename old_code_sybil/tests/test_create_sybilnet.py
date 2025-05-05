@@ -4,13 +4,14 @@ import os
 
 from sybil import Serie, Sybil
 
+
 def test_create_sybilnet():
     from sybil.models.sybil import SybilNet
 
     fake_args = argparse.Namespace(
         dropout=0.1,
         max_followup=5,
-        )
+    )
 
     sybil_net = SybilNet(fake_args)
 

@@ -1,9 +1,11 @@
+import copy
+from ast import literal_eval
+from collections import Counter
+
 import numpy as np
 from tqdm import tqdm
-from ast import literal_eval
+
 from sybil.datasets.nlst import NLST_Survival_Dataset
-from collections import Counter
-import copy
 
 DEVICE_ID = {
     "GE MEDICAL SYSTEMS": 0,
@@ -87,9 +89,11 @@ class MGH_Dataset(NLST_Survival_Dataset):
                         "series": series_id,
                         "pid": pid,
                         "device": device,
-                        "lung_rads": -1
-                        if exam_dict["lung_rads"] == np.nan
-                        else exam_dict["lung_rads"],
+                        "lung_rads": (
+                            -1
+                            if exam_dict["lung_rads"] == np.nan
+                            else exam_dict["lung_rads"]
+                        ),
                         "IV_contrast": exam_dict["IV_contrast"],
                         "lung_cancer_screening": exam_dict["lung_cancer_screening"],
                         "cancer_location": np.zeros(14),  # mgh has no annotations
