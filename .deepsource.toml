@@ -13,7 +13,4 @@ name = "docker"
 name = "isort"
 
 [[transformers]]
-name = "autopep8"
-
-[[transformers]]
 name = "black"
