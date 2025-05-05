@@ -301,7 +301,14 @@ def predict(
     # Handle DICOM metadata
     dicom_metadata_list = []
     if file_type == "dicom":
-        dicom_metadata_list = [pydicom.dcmread(f) for f in input_files]
+        # First, load all DICOM metadata
+        dicom_metadata_dict = {os.path.normpath(f): pydicom.dcmread(f) for f in input_files}
+        
+        # Then, reorder according to the serie's ordered paths
+        # This ensures dicom_metadata_list matches the order of images in serie
+        ordered_paths = [os.path.normpath(path) for path in serie._meta.paths]
+        dicom_metadata_list = [dicom_metadata_dict[path] for path in ordered_paths]
+        
         if not dicom_metadata_list:
             logging.warning("⚠️ No DICOM metadata could be loaded from input files")
 
