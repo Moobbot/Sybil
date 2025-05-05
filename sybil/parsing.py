@@ -1,7 +1,8 @@
 import argparse
-import torch
 import os
 import pwd
+
+import torch
 from pytorch_lightning import Trainer
 
 EMPTY_NAME_ERR = 'Name of augmentation or one of its arguments cant be empty\n\

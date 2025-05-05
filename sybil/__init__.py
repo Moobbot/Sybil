@@ -17,9 +17,15 @@ except PackageNotFoundError:  # pragma: no cover
 finally:
     del version, PackageNotFoundError
 
+import sybil.utils.logging_utils
 from sybil.model import Sybil
 from sybil.serie import Serie
-from sybil.utils.visualization import visualize_attentions, collate_attentions
-import sybil.utils.logging_utils
+from sybil.utils.visualization import collate_attentions, visualize_attentions
 
-__all__ = ["Sybil", "Serie", "visualize_attentions", "collate_attentions", "__version__"]
+__all__ = [
+    "Sybil",
+    "Serie",
+    "visualize_attentions",
+    "collate_attentions",
+    "__version__",
+]

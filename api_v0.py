@@ -7,16 +7,15 @@ import shutil
 import socket
 import time
 import typing
-import uuid
 import urllib
+import uuid
 import zipfile
-
 from typing import Literal
 
 import numpy as np
 import pydicom
-from PIL import Image
 from flask import Flask, jsonify, request, send_file, send_from_directory
+from PIL import Image
 from werkzeug.utils import secure_filename
 
 from sybil.datasets import utils

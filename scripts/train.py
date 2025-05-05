@@ -1,20 +1,19 @@
-from collections import OrderedDict
-from argparse import Namespace
-import pickle
 import os
+import pickle
 import sys
+from argparse import Namespace
+from collections import OrderedDict
 
 import pytorch_lightning as pl
 import torch
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-from sybil.utils.helpers import get_dataset
+import sybil.models.sybil as model
+import sybil.utils.loading as loaders
 import sybil.utils.losses as losses
 import sybil.utils.metrics as metrics
-import sybil.utils.loading as loaders
-import sybil.models.sybil as model
 from sybil.parsing import parse_args
-
+from sybil.utils.helpers import get_dataset
 
 
 class SybilLightning(pl.LightningModule):
@@ -40,7 +39,7 @@ class SybilLightning(pl.LightningModule):
         self._list_of_metrics = [
             metrics.get_classification_metrics,
             metrics.get_survival_metrics,
-            metrics.get_risk_metrics
+            metrics.get_risk_metrics,
         ]
 
     def set_finetune(self, finetune_flag):
@@ -144,7 +143,7 @@ class SybilLightning(pl.LightningModule):
         self.log_dict(epoch_metrics, prog_bar=True, logger=True)
 
     def test_epoch_end(self, outputs):
-        self.save_prefix= 'test'
+        self.save_prefix = "test"
         if len(outputs) == 0:
             return
         outputs = gather_step_outputs(outputs)
@@ -337,13 +336,17 @@ def train(args):
             dirpath=args.save_dir,
             save_top_k=1,
             verbose=True,
-            monitor="val_{}".format(args.tuning_metric)
-            if args.tuning_metric is not None
-            else None,
+            monitor=(
+                "val_{}".format(args.tuning_metric)
+                if args.tuning_metric is not None
+                else None
+            ),
             save_last=True,
-            mode="min"
-            if args.tuning_metric is not None and "loss" in args.tuning_metric
-            else "max",
+            mode=(
+                "min"
+                if args.tuning_metric is not None and "loss" in args.tuning_metric
+                else "max"
+            ),
         )
         args.callbacks = [checkpoint_callback]
     trainer = pl.Trainer.from_argparse_args(args)
@@ -370,13 +373,16 @@ def train(args):
         print("{} -- {}".format(key.upper(), value))
 
     if args.snapshot is not None:
-        module = module.load_from_checkpoint(checkpoint_path= args.snapshot, strict=False)
+        module = module.load_from_checkpoint(
+            checkpoint_path=args.snapshot, strict=False
+        )
         module.args = args
-    
+
     trainer.fit(module, train_dataset, dev_dataset)
     args.model_path = trainer.checkpoint_callback.best_model_path
     print("Saving args to {}".format(args.results_path))
     pickle.dump(vars(args), open(args.results_path, "wb"))
+
 
 def test(args):
     trainer = pl.Trainer.from_argparse_args(args)
@@ -397,7 +403,7 @@ def test(args):
 
     args.censoring_distribution = metrics.get_censoring_dist(train_dataset.dataset)
     module = SybilLightning(args)
-    module = module.load_from_checkpoint(checkpoint_path= args.snapshot, strict=False)
+    module = module.load_from_checkpoint(checkpoint_path=args.snapshot, strict=False)
     module.args = args
 
     # print args
@@ -408,6 +414,7 @@ def test(args):
 
     print("Saving args to {}".format(args.results_path))
     pickle.dump(vars(args), open(args.results_path, "wb"))
+
 
 if __name__ == "__main__":
     args = parse_args()

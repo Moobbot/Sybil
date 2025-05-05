@@ -1,14 +1,15 @@
-from argparse import Namespace
-import hashlib
 import collections.abc as container_abcs
+import hashlib
 import re
+from argparse import Namespace
 from typing import Literal
+
 import torch
 from torch.utils import data
 
-from sybil.utils.sampler import DistributedWeightedSampler
 from sybil.augmentations import get_augmentations
-from sybil.loaders.image_loaders import OpenCVLoader, DicomLoader
+from sybil.loaders.image_loaders import DicomLoader, OpenCVLoader
+from sybil.utils.sampler import DistributedWeightedSampler
 
 string_classes = (str, bytes)
 int_classes = int

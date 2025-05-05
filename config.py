@@ -1,9 +1,9 @@
 import os
 
-PYTHON_ENV = "develop" # "production"
+PYTHON_ENV = "develop"  # "production"
 # Cấu hình Flask
-PORT_CONNECT = 5000 # 5555
-HOST_CONNECT = "0.0.0.0" # "0.0.0.0"
+PORT_CONNECT = 5000  # 5555
+HOST_CONNECT = "0.0.0.0"  # "0.0.0.0"
 UPLOAD_FOLDER = "uploads"
 RESULTS_FOLDER = "results"
 CHECKPOINT_DIR = "sybil_checkpoints"
@@ -50,7 +50,7 @@ MODEL_CONFIG = {
 }
 
 PREDICTION_CONFIG = {
-    "OVERLAY_PATH": "overlay", # "serie_0"
+    "OVERLAY_PATH": "overlay",  # "serie_0"
     "PREDICTION_PATH": os.path.join(RESULTS_FOLDER, "prediction_scores.json"),
     "ATTENTION_PATH": os.path.join(RESULTS_FOLDER, "attention_scores.pkl"),
     "RANKING_PATH": os.path.join(RESULTS_FOLDER, "image_ranking.json"),

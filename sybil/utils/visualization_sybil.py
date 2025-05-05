@@ -1,11 +1,16 @@
+import os
+from typing import Dict, List, Union
+
 import numpy as np
 import torch
 import torch.nn.functional as F
-from sybil.serie import Serie
-from typing import Dict, List, Union
-import os
 
-def collate_attentions(attention_dict: Dict[str, np.ndarray], N: int, eps=1e-6) -> np.ndarray:
+from sybil.serie import Serie
+
+
+def collate_attentions(
+    attention_dict: Dict[str, np.ndarray], N: int, eps=1e-6
+) -> np.ndarray:
     a1 = attention_dict["image_attention_1"]
     v1 = attention_dict["volume_attention_1"]
 
@@ -29,7 +34,10 @@ def collate_attentions(attention_dict: Dict[str, np.ndarray], N: int, eps=1e-6) 
 
     return attention_up
 
-def build_overlayed_images(images: List[np.ndarray], attention: np.ndarray, gain: int = 3):
+
+def build_overlayed_images(
+    images: List[np.ndarray], attention: np.ndarray, gain: int = 3
+):
     overlayed_images = []
     N = len(images)
     for i in range(N):
@@ -96,6 +104,7 @@ def save_images(img_list: List[np.ndarray], directory: str, name: str):
         None
     """
     import imageio
+
     os.makedirs(directory, exist_ok=True)
     path = os.path.join(directory, f"{name}.gif")
     imageio.mimsave(path, img_list)

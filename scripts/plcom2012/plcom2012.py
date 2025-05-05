@@ -1,6 +1,7 @@
 import math
-from tqdm import tqdm
 import pickle
+
+from tqdm import tqdm
 
 
 class RiskModel(object):
@@ -40,6 +41,7 @@ class RiskModel(object):
     @property
     def input_transformers(self):
         pass
+
 
 class PLCOm2012(RiskModel):
     def __init__(self, args):

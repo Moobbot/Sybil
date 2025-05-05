@@ -1,13 +1,13 @@
 import functools
-from typing import List, Optional, NamedTuple, Literal
 from argparse import Namespace
+from typing import List, Literal, NamedTuple, Optional
 
-import torch
 import numpy as np
 import pydicom
+import torch
 import torchio as tio
 
-from sybil.datasets.utils import order_slices, VOXEL_SPACING
+from sybil.datasets.utils import VOXEL_SPACING, order_slices
 from sybil.utils.loading import get_sample_loader
 
 
@@ -149,9 +149,7 @@ class Serie:
             CT volume of shape (1, C, N, H, W)
         """
 
-        input_dicts = [
-            self._loader.get_image(path) for path in self._meta.paths
-        ]
+        input_dicts = [self._loader.get_image(path) for path in self._meta.paths]
 
         x = torch.cat([i["input"].unsqueeze(0) for i in input_dicts], dim=0)
 

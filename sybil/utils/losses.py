@@ -18,7 +18,9 @@ def get_survival_loss(model_output, batch, model, args):
     logging_dict, predictions = OrderedDict(), OrderedDict()
     logit = model_output["logit"]
     y_seq, y_mask = batch["y_seq"], batch["y_mask"]
-    loss = F.binary_cross_entropy_with_logits(logit, y_seq.float(), weight=y_mask.float(), reduction='sum') / torch.sum(y_mask.float())
+    loss = F.binary_cross_entropy_with_logits(
+        logit, y_seq.float(), weight=y_mask.float(), reduction="sum"
+    ) / torch.sum(y_mask.float())
     logging_dict["survival_loss"] = loss.detach()
     predictions["probs"] = torch.sigmoid(logit).detach()
     predictions["golds"] = batch["y"]
@@ -29,7 +31,13 @@ def get_survival_loss(model_output, batch, model, args):
 def get_annotation_loss(model_output, batch, model, args):
     total_loss, logging_dict, predictions = 0, OrderedDict(), OrderedDict()
 
-    B, _, N, H, W, = model_output["activ"].shape
+    (
+        B,
+        _,
+        N,
+        H,
+        W,
+    ) = model_output["activ"].shape
 
     batch_mask = batch["has_annotation"]
 
@@ -74,7 +82,7 @@ def get_annotation_loss(model_output, batch, model, args):
             loss = kldiv.sum() / num_annotated_samples
             logging_dict["image_attention_loss_{}".format(attn_num)] = loss.detach()
             total_loss += args.image_attention_loss_lambda * loss
-            
+
             # attend to cancer side
             cancer_side_mask = (batch["cancer_laterality"][:, :2].sum(-1) == 1).float()[
                 :, None
@@ -98,9 +106,9 @@ def get_annotation_loss(model_output, batch, model, args):
                 F.cross_entropy(side_attn_log, cancer_side_gold, reduction="none")
                 * cancer_side_mask
             ).sum() / num_annotated_samples
-            logging_dict[
-                "image_side_attention_loss_{}".format(attn_num)
-            ] = loss.detach()
+            logging_dict["image_side_attention_loss_{}".format(attn_num)] = (
+                loss.detach()
+            )
             total_loss += args.image_attention_loss_lambda * loss
 
         if model_output.get("volume_attention_{}".format(attn_num), None) is not None:
@@ -108,7 +116,9 @@ def get_annotation_loss(model_output, batch, model, args):
             annotation_gold = batch["annotation_areas"].float() * batch_mask[:, None]
 
             if N != args.num_images:
-                annotation_gold = F.interpolate(annotation_gold.unsqueeze(1), (N), mode= 'linear', align_corners = True)[:,0]
+                annotation_gold = F.interpolate(
+                    annotation_gold.unsqueeze(1), (N), mode="linear", align_corners=True
+                )[:, 0]
             area_per_slice = annotation_gold.sum(-1).unsqueeze(-1)
             area_per_slice[area_per_slice == 0] = 1
             annotation_gold /= area_per_slice
@@ -131,7 +141,7 @@ def get_annotation_loss(model_output, batch, model, args):
 
             logging_dict["volume_attention_loss_{}".format(attn_num)] = loss.detach()
             total_loss += args.volume_attention_loss_lambda * loss
-            
+
             if isinstance(side_attn, torch.Tensor):
                 # attend to cancer side
                 cancer_side_mask = (
@@ -152,9 +162,9 @@ def get_annotation_loss(model_output, batch, model, args):
                     F.cross_entropy(side_attn_log, cancer_side_gold, reduction="none")
                     * cancer_side_mask
                 ).sum() / num_annotated_samples
-                logging_dict[
-                    "volume_side_attention_loss_{}".format(attn_num)
-                ] = loss.detach()
+                logging_dict["volume_side_attention_loss_{}".format(attn_num)] = (
+                    loss.detach()
+                )
                 total_loss += args.volume_attention_loss_lambda * loss
 
     return total_loss * args.annotation_loss_lambda, logging_dict, predictions
@@ -184,15 +194,19 @@ def get_risk_factor_loss(model_output, batch, model, args):
 
     return total_loss * args.primary_loss_lambda, logging_dict, predictions
 
+
 def discriminator_loss(model_output, batch, model, args):
     logging_dict, predictions = OrderedDict(), OrderedDict()
     d_output = model.discriminator(model_output, batch)
-    loss = F.cross_entropy(d_output['logit'], batch['origin_dataset'].long()) * args.adv_loss_lambda
-    logging_dict['discrim_loss'] = loss.detach()
-    predictions['discrim_probs'] = d_output['logit'].detach()
-    predictions['discrim_golds'] = batch['origin_dataset']
+    loss = (
+        F.cross_entropy(d_output["logit"], batch["origin_dataset"].long())
+        * args.adv_loss_lambda
+    )
+    logging_dict["discrim_loss"] = loss.detach()
+    predictions["discrim_probs"] = d_output["logit"].detach()
+    predictions["discrim_golds"] = batch["origin_dataset"]
 
     if model.reverse_discrim_loss:
         loss = -loss
-        
+
     return loss, logging_dict, predictions

@@ -1,13 +1,17 @@
 import logging
 import os
+from typing import Dict, List, Union
+
 import imageio
 import numpy as np
 import pydicom
 import torch
 import torch.nn.functional as F
+
+from config import MODEL_CONFIG
+from config import VISUALIZATION_CONFIG as cfg
 from sybil.serie import Serie
-from typing import Dict, List, Union
-from config import MODEL_CONFIG, VISUALIZATION_CONFIG as cfg
+
 from .config import VISUALIZATION_CONFIG as viz_cfg
 from .dicom_handler import DicomHandler
 
