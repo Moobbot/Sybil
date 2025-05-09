@@ -2,7 +2,7 @@ import os
 
 PYTHON_ENV = "develop" # "production"
 # Cấu hình Flask
-PORT_CONNECT = 5000 # 5555
+PORT_CONNECT = 5555 # 5555
 HOST_CONNECT = "0.0.0.0" # "0.0.0.0"
 UPLOAD_FOLDER = "uploads"
 RESULTS_FOLDER = "results"
