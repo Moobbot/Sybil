@@ -8,10 +8,10 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import os
-import sys
 import inspect
+import os
 import shutil
+import sys
 
 # -- Path setup --------------------------------------------------------------
 
@@ -50,7 +50,8 @@ try:
     cmd_line_template = (
         "sphinx-apidoc --implicit-namespaces -f -o {outputdir} {moduledir}"
     )
-    cmd_line = cmd_line_template.format(outputdir=output_dir, moduledir=module_dir)
+    cmd_line = cmd_line_template.format(
+        outputdir=output_dir, moduledir=module_dir)
 
     args = cmd_line.split(" ")
     if tuple(sphinx.__version__.split(".")) >= ("1", "7"):

@@ -1,22 +1,22 @@
+import os
 from argparse import Namespace
 from io import BytesIO
-import os
-from typing import NamedTuple, Union, Dict, List, Optional, Tuple
+from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 from urllib.request import urlopen
 from zipfile import ZipFile
 
-import torch
 import numpy as np
+import torch
 
-from sybil.serie import Serie
-from sybil.models.sybil import SybilNet
 from sybil.models.calibrator import SimpleClassifierGroup
-from sybil.utils.logging_utils import get_logger
+from sybil.models.sybil import SybilNet
+from sybil.serie import Serie
 from sybil.utils.device_utils import (
     get_default_device,
-    get_most_free_gpu,
     get_device_mem_info,
+    get_most_free_gpu,
 )
+from sybil.utils.logging_utils import get_logger
 
 # Leaving this here for a bit; these are IDs to download the models from Google Drive
 NAME_TO_FILE = {
@@ -177,7 +177,8 @@ class Sybil:
         print("calibrator_path:", calibrator_path)
         # Check calibrator path before continuing
         if (calibrator_path is not None) and (not os.path.exists(calibrator_path)):
-            raise ValueError(f"Path not found for calibrator {calibrator_path}")
+            raise ValueError(
+                f"Path not found for calibrator {calibrator_path}")
 
         # Set device.
         # If set manually, use it and stay there.
@@ -195,7 +196,8 @@ class Sybil:
         self.to(self.device)
 
         if calibrator_path is not None:
-            self.calibrator = SimpleClassifierGroup.from_json_grouped(calibrator_path)
+            self.calibrator = SimpleClassifierGroup.from_json_grouped(
+                calibrator_path)
         else:
             self.calibrator = None
 
@@ -282,10 +284,12 @@ class Sybil:
         if isinstance(series, Serie):
             series = [series]
         elif not isinstance(series, list):
-            raise ValueError("Expected either a Serie object or list of Serie objects.")
+            raise ValueError(
+                "Expected either a Serie object or list of Serie objects.")
 
         scores: List[List[float]] = []
-        attentions: List[Dict[str, np.ndarray]] = [] if return_attentions else None
+        attentions: List[Dict[str, np.ndarray]
+                         ] = [] if return_attentions else None
         for serie in series:
             if not isinstance(serie, Serie):
                 raise ValueError("Expected a list of Serie objects.")
@@ -339,7 +343,8 @@ class Sybil:
         print("Predict called")
         # Set CPU threads available to torch
         num_threads = _torch_set_num_threads(threads)
-        self._logger.debug(f"Using {num_threads} threads for PyTorch inference")
+        self._logger.debug(
+            f"Using {num_threads} threads for PyTorch inference")
 
         if self._device_flexible:
             self.device = self._pick_device()
@@ -367,7 +372,8 @@ class Sybil:
                 att = {}
                 for key in attention_keys:
                     att[key] = np.stack(
-                        [attentions_[j][i][key] for j in range(len(self.ensemble))]
+                        [attentions_[j][i][key]
+                            for j in range(len(self.ensemble))]
                     )
                 attentions.append(att)
 
@@ -392,6 +398,7 @@ class Sybil:
 
         """
         from sybil.utils.metrics import get_survival_metrics
+
         print("Evaluate called")
 
         if isinstance(series, Serie):
@@ -420,7 +427,8 @@ class Sybil:
             max_followup=self._max_followup, censoring_distribution=self._censoring_dist
         )
         out = get_survival_metrics(input_dict, args)
-        auc = [float(out[f"{i + 1}_year_auc"]) for i in range(self._max_followup)]
+        auc = [float(out[f"{i + 1}_year_auc"])
+               for i in range(self._max_followup)]
         c_index = float(out["c_index"])
 
         return Evaluation(

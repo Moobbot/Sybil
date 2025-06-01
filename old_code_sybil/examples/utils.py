@@ -11,12 +11,13 @@ def download_file(url, filepath):
 
     # Check if the request was successful
     if response.status == 200:
-        with open(filepath, 'wb') as f:
+        with open(filepath, "wb") as f:
             f.write(response.read())
     else:
         print(f"Failed to download file. Status code: {response.status_code}")
 
     return filepath
+
 
 def get_demo_data():
     demo_data_url = "https://www.dropbox.com/scl/fi/covbvo6f547kak4em3cjd/sybil_example.zip?rlkey=7a13nhlc9uwga9x7pmtk1cf1c&st=dqi0cf9k&dl=1"
@@ -34,7 +35,8 @@ def get_demo_data():
     if not os.path.exists(demo_data_dir):
         print(f"Extracting demo data to {demo_data_dir}")
         import zipfile
-        with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+
+        with zipfile.ZipFile(zip_file_path, "r") as zip_ref:
             zip_ref.extractall(demo_data_dir)
 
     dicom_files = os.listdir(image_data_dir)

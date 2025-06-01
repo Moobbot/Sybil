@@ -1,11 +1,13 @@
 import os
+from typing import Dict, List, Union
+
 import imageio
 import numpy as np
 import pydicom
 import torch
 import torch.nn.functional as F
+
 from sybil.serie import Serie
-from typing import Dict, List, Union
 
 
 def collate_attentions(
@@ -17,8 +19,10 @@ def collate_attentions(
             "⚠️ Attention dictionary is empty. Ensure model returns valid attention maps."
         )
 
-    a1 = torch.tensor(attention_dict.get("image_attention_1"), dtype=torch.float32)
-    v1 = torch.tensor(attention_dict.get("volume_attention_1"), dtype=torch.float32)
+    a1 = torch.tensor(attention_dict.get(
+        "image_attention_1"), dtype=torch.float32)
+    v1 = torch.tensor(attention_dict.get(
+        "volume_attention_1"), dtype=torch.float32)
 
     # Mean over ensemble
     a1 = torch.exp(a1).mean(0)
@@ -171,7 +175,8 @@ def save_attention_images_dicom(
                     "InstanceNumber",
                 ]:
                     if hasattr(dicom_metadata_list[idx], attr):
-                        setattr(ds, attr, getattr(dicom_metadata_list[idx], attr))
+                        setattr(ds, attr, getattr(
+                            dicom_metadata_list[idx], attr))
 
                 # Gán ảnh vào PixelData
                 ds.PixelData = img_uint8.tobytes()
@@ -191,7 +196,8 @@ def visualize_attentions(
     gain: int = 3,
     attention_threshold: float = 1e-3,
     save_as_dicom: bool = False,  # Lựa chọn lưu DICOM hoặc PNG
-    dicom_metadata_list: List[pydicom.Dataset] = None,  # Danh sách metadata DICOM
+    # Danh sách metadata DICOM
+    dicom_metadata_list: List[pydicom.Dataset] = None,
 ) -> List[List[np.ndarray]]:
     """
     Tạo ảnh overlay từ attention và lưu vào thư mục.

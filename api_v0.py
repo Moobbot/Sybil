@@ -7,16 +7,15 @@ import shutil
 import socket
 import time
 import typing
-import uuid
 import urllib
+import uuid
 import zipfile
-
 from typing import Literal
 
 import numpy as np
 import pydicom
-from PIL import Image
 from flask import Flask, jsonify, request, send_file, send_from_directory
+from PIL import Image
 from werkzeug.utils import secure_filename
 
 from sybil.datasets import utils
@@ -54,7 +53,8 @@ MODEL_PATHS = [
         "624407ef8e3a2a009f9fa51f9846fe9a",
     ]
 ]
-calibrator_path = os.path.join(CHECKPOINT_DIR, "sybil_ensemble_simple_calibrator.json")
+calibrator_path = os.path.join(
+    CHECKPOINT_DIR, "sybil_ensemble_simple_calibrator.json")
 
 
 def allowed_file(filename):
@@ -192,7 +192,8 @@ def predict(
             voxel_spacing = utils.VOXEL_SPACING
             logger.debug(f"Using default voxel spacing: {voxel_spacing}")
 
-    logger.debug(f"Processing {len(input_files)} {file_type} files from {image_dir}")
+    logger.debug(
+        f"Processing {len(input_files)} {file_type} files from {image_dir}")
 
     assert file_type in {"dicom", "png"}
     file_type = typing.cast(typing.Literal["dicom", "png"], file_type)
@@ -208,7 +209,8 @@ def predict(
     # model = Sybil(model_name)
     # print("model loaded")
     # Tạo đối tượng Serie - Get risk scores
-    serie = Serie(input_files, voxel_spacing=voxel_spacing, file_type=file_type)
+    serie = Serie(input_files, voxel_spacing=voxel_spacing,
+                  file_type=file_type)
     prediction = model.predict(
         [serie], return_attentions=return_attentions, threads=threads
     )
@@ -434,7 +436,8 @@ def convert_dicom_list():
             )
         except Exception as e:
             return (
-                jsonify({"error": f"Error processing file {file.filename}: {str(e)}"}),
+                jsonify(
+                    {"error": f"Error processing file {file.filename}: {str(e)}"}),
                 500,
             )
 

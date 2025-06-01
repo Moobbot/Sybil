@@ -1,13 +1,13 @@
 import functools
-from typing import List, Optional, NamedTuple, Literal
 from argparse import Namespace
+from typing import List, Literal, NamedTuple, Optional
 
-import torch
 import numpy as np
 import pydicom
+import torch
 import torchio as tio
 
-from sybil.datasets.utils import order_slices, VOXEL_SPACING
+from sybil.datasets.utils import VOXEL_SPACING, order_slices
 from sybil.utils.loading import get_sample_loader
 
 
@@ -111,14 +111,16 @@ class Serie:
         year_to_cancer = self._censor_time  # type: ignore
 
         y_seq = np.zeros(max_followup, dtype=np.float64)
-        y = int((year_to_cancer < max_followup) and self._label)  # type: ignore
+        y = int((year_to_cancer < max_followup)
+                and self._label)  # type: ignore
         if y:
             y_seq[year_to_cancer:] = 1
         else:
             year_to_cancer = min(year_to_cancer, max_followup - 1)
 
         y_mask = np.array(
-            [1] * (year_to_cancer + 1) + [0] * (max_followup - (year_to_cancer + 1)),
+            [1] * (year_to_cancer + 1) + [0] *
+            (max_followup - (year_to_cancer + 1)),
             dtype=np.float64,
         )
         return Label(y=y, y_seq=y_seq, y_mask=y_mask, censor_time=year_to_cancer)
@@ -133,7 +135,8 @@ class Serie:
             List of CT slices of shape (1, C, H, W)
         """
 
-        loader = get_sample_loader("test", self._args, apply_augmentations=False)
+        loader = get_sample_loader(
+            "test", self._args, apply_augmentations=False)
         input_dicts = [loader.get_image(path) for path in self._meta.paths]
         images = [i["input"] for i in input_dicts]
         return images
@@ -149,9 +152,8 @@ class Serie:
             CT volume of shape (1, C, N, H, W)
         """
 
-        input_dicts = [
-            self._loader.get_image(path) for path in self._meta.paths
-        ]
+        input_dicts = [self._loader.get_image(
+            path) for path in self._meta.paths]
 
         x = torch.cat([i["input"].unsqueeze(0) for i in input_dicts], dim=0)
 
@@ -209,7 +211,8 @@ class Serie:
             pixel_spacing = []
             manufacturer = ""
             voxel_spacing = (
-                torch.tensor(voxel_spacing + [1]) if voxel_spacing is not None else None
+                torch.tensor(voxel_spacing +
+                             [1]) if voxel_spacing is not None else None
             )
 
         meta = Meta(
@@ -274,4 +277,5 @@ class Serie:
                 f"slice thickness {self._meta.thickness} is greater than {args.slice_thickness_filter}."
             )
         if self._meta.voxel_spacing is None:
-            raise ValueError("voxel spacing either not set or not found in DICOM")
+            raise ValueError(
+                "voxel spacing either not set or not found in DICOM")
