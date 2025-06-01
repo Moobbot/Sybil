@@ -290,7 +290,8 @@ def predict(
     logger.debug(f"Prediction finished. Results:\n{prediction_scores}")
 
     # Save predictions
-    prediction_path = PREDICTION_CONFIG["PREDICTION_PATH"]
+    # prediction_path = PREDICTION_CONFIG["PREDICTION_PATH"]
+    prediction_path = os.path.join(output_dir, "prediction_scores.json")
     pred_dict = {"predictions": prediction.scores}
     with open(prediction_path, "w") as f:
         json.dump(pred_dict, f, indent=2)
@@ -314,14 +315,16 @@ def predict(
 
     # Process attention scores if requested
     if return_attentions:
-        attention_path = PREDICTION_CONFIG["ATTENTION_PATH"]
+        # attention_path = PREDICTION_CONFIG["ATTENTION_PATH"]
+        attention_path = os.path.join(output_dir, "attention_scores.pkl")
         with open(attention_path, "wb") as f:
             pickle.dump(prediction, f)
 
         attention_info = process_attention_scores(prediction, serie, input_files)
 
         # Save rankings
-        ranking_path = PREDICTION_CONFIG["RANKING_PATH"]
+        # ranking_path = PREDICTION_CONFIG["RANKING_PATH"]
+        ranking_path = os.path.join(output_dir, "image_ranking.json")
         with open(ranking_path, "w") as f:
             json.dump(attention_info, f, indent=2)
 

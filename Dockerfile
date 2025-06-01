@@ -13,10 +13,12 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 # Cập nhật pip lên phiên bản 24.0
 RUN pip install --upgrade pip==24.0
 
-COPY . .
+COPY requirements.txt setup.py .
 
 # Cài đặt dependencies từ setup.py
 RUN python setup.py
+
+COPY . .
 
 
 EXPOSE 5555

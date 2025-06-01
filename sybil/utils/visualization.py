@@ -244,7 +244,8 @@ def visualize_attentions(
         )
 
         if save_directory:
-            save_path = os.path.join(save_directory, f"serie_{serie_idx}")
+            # save_path = os.path.join(save_directory, f"serie_{serie_idx}")
+            save_path = save_directory
             os.makedirs(save_path, exist_ok=True)
 
             save_attention_images(
