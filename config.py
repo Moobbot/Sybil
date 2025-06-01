@@ -5,9 +5,11 @@ PYTHON_ENV = "develop"  # "production"
 PORT_CONNECT = 5555  # 5555
 HOST_CONNECT = "0.0.0.0"  # "0.0.0.0"
 UPLOAD_FOLDER = os.getenv(
-    "UPLOAD_FOLDER", "../backend/src/data/dicom/uploads")  # Thư mục tải lên
+    "UPLOAD_FOLDER", "../backend/src/data/dicom/uploads"
+)  # Thư mục tải lên
 RESULTS_FOLDER = os.getenv(
-    "RESULTS_FOLDER", "../backend/src/data/dicom/results")  # Thư mục kết quả
+    "RESULTS_FOLDER", "../backend/src/data/dicom/results"
+)  # Thư mục kết quả
 CHECKPOINT_DIR = "sybil_checkpoints"
 ALLOWED_EXTENSIONS = {"dcm", "png", "jpg", "jpeg"}
 
@@ -31,8 +33,7 @@ MODEL_PATHS = [
     ]
 ]
 
-CALIBRATOR_PATH = os.path.join(
-    CHECKPOINT_DIR, "sybil_ensemble_simple_calibrator.json")
+CALIBRATOR_PATH = os.path.join(CHECKPOINT_DIR, "sybil_ensemble_simple_calibrator.json")
 
 # Cấu hình Visualization
 VISUALIZATION_CONFIG = {
