@@ -10,7 +10,7 @@ import numpy as np
 import pydicom
 from PIL import Image
 from werkzeug.utils import secure_filename
-from config import PREDICTION_CONFIG, PYTHON_ENV, RESULTS_FOLDER, UPLOAD_FOLDER
+from config import PYTHON_ENV, RESULTS_FOLDER, UPLOAD_FOLDER
 
 
 def allowed_file(filename):
@@ -78,19 +78,27 @@ def dicom_to_png(dicom_file):
     return img_base64
 
 
-def save_uploaded_files(files, session_id):
-    """Save the files uploaded by session_id"""
-    upload_path = os.path.join(UPLOAD_FOLDER, session_id)
-    os.makedirs(upload_path, exist_ok=True)
+def save_uploaded_files(files, session_id, folder_save=UPLOAD_FOLDER):
+    """Save uploaded files to the specified folder
+
+    Args:
+        files (list): List of uploaded files
+        session_id (str): Session ID for the upload
+        folder_save (str): Folder to save the files to
+
+    Returns:
+        tuple: (list of saved files, path to saved files)
+    """
     uploaded_files = []
+    upload_path = os.path.join(folder_save, session_id)
+    os.makedirs(upload_path, exist_ok=True)
 
     for file in files:
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file_path = os.path.join(upload_path, filename)
             file.save(file_path)
-            uploaded_files.append(file_path)
-            print(f"Uploaded file: {filename}")
+            uploaded_files.append(filename)
 
     return uploaded_files, upload_path
 
@@ -101,18 +109,15 @@ def get_file_path(session_id, filename):
 
 
 def get_overlay_files(output_dir, session_id):
-    """Lấy danh sách ảnh overlay trong thư mục 'serie_0'."""
-    overlay_dir = os.path.join(output_dir, "serie_0")
-    # PREDICTION_CONFIG["OVERLAY_PATH"]
-
-    if not os.path.exists(overlay_dir) or not os.listdir(overlay_dir):
+    """Lấy danh sách ảnh overlay trong thư mục session."""
+    if not os.path.exists(output_dir) or not os.listdir(output_dir):
         print(f"⚠️ No overlay images found for session {session_id}")
         return []
 
     return [
         img
-        for img in os.listdir(overlay_dir)
-        if os.path.isfile(os.path.join(overlay_dir, img))
+        for img in os.listdir(output_dir)
+        if os.path.isfile(os.path.join(output_dir, img)) and img.endswith('.dcm')
     ]
 
 

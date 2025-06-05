@@ -1,27 +1,34 @@
 import os
 
-PYTHON_ENV = "develop"  # "production"
-# Cấu hình Flask
-PORT_CONNECT = 5555  # 5555
+PYTHON_ENV = os.getenv("PYTHON_ENV", "develop")  # "production"
+
+# Flask configuration
+PORT_CONNECT = int(os.getenv("PORT_CONNECT", 5555))
 HOST_CONNECT = "0.0.0.0"  # "0.0.0.0"
+
+# Upload and results directories - support both relative and absolute paths
 UPLOAD_FOLDER = os.getenv(
-    "UPLOAD_FOLDER", "../backend/src/data/dicom/uploads"
-)  # Thư mục tải lên
+    "UPLOAD_FOLDER", os.path.join(os.path.dirname(__file__), "uploads")
+)  # Upload directory
 RESULTS_FOLDER = os.getenv(
-    "RESULTS_FOLDER", "../backend/src/data/dicom/results"
-)  # Thư mục kết quả
+    "RESULTS_FOLDER", os.path.join(os.path.dirname(__file__), "results")
+)  # Results directory
+CLEANUP_FOLDER = os.getenv(
+    "CLEANUP_FOLDER", os.path.join(os.path.dirname(__file__), "cleanup")
+)  # Results directory
 CHECKPOINT_DIR = "sybil_checkpoints"
 ALLOWED_EXTENSIONS = {"dcm", "png", "jpg", "jpeg"}
 
-# Tạo thư mục nếu chưa có
+# Create directories if they don't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(RESULTS_FOLDER, exist_ok=True)
+os.makedirs(CLEANUP_FOLDER, exist_ok=True)
 os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 
-# URL tải checkpoint
-CHECKPOINT_URL = "https://github.com/reginabarzilaygroup/Sybil/releases/download/v1.5.0/sybil_checkpoints.zip"
+# Checkpoint download URL
+CHECKPOINT_URL = "https://dl.dropboxusercontent.com/scl/fi/56p7wa6ose6yxuzvj5ejh/sybil_checkpoints.zip?rlkey=13zvrawog90y6ntfst80sveg8&dl=1"
 
-# Danh sách checkpoint mô hình
+# List of model checkpoints
 MODEL_PATHS = [
     os.path.join(CHECKPOINT_DIR, f"{model}.ckpt")
     for model in [
@@ -35,17 +42,17 @@ MODEL_PATHS = [
 
 CALIBRATOR_PATH = os.path.join(CHECKPOINT_DIR, "sybil_ensemble_simple_calibrator.json")
 
-# Cấu hình Visualization
+# Visualization configuration
 VISUALIZATION_CONFIG = {
-    # Cấu hình attention ranking
+    # Attention ranking configuration
     "RANKING": {
-        "DEFAULT_RETURN_TYPE": "top",  # 'all', 'top', hoặc 'none'
-        "DEFAULT_TOP_K": 6,  # Số lượng ảnh top mặc định
-        # "MIN_SCORE": 0.0,  # Điểm attention tối thiểu để xem xét
+        "DEFAULT_RETURN_TYPE": "top",  # 'all', 'top', or 'none'
+        "DEFAULT_TOP_K": 6,  # Default number of top images
+        # "MIN_SCORE": 0.0,  # Minimum attention score threshold
     },
 }
 
-# Cấu hình Model
+# Model configuration
 MODEL_CONFIG = {
     "RETURN_ATTENTIONS_DEFAULT": True,
     "WRITE_ATTENTION_IMAGES_DEFAULT": True,
@@ -53,8 +60,9 @@ MODEL_CONFIG = {
     "SAVE_ORIGINAL_DEFAULT": True,
 }
 
+# Prediction configuration - support both relative and absolute paths
 PREDICTION_CONFIG = {
-    "OVERLAY_PATH": "overlay",  # "serie_0"
+    "OVERLAY_PATH": "overlay",
     "PREDICTION_PATH": os.path.join(RESULTS_FOLDER, "prediction_scores.json"),
     "ATTENTION_PATH": os.path.join(RESULTS_FOLDER, "attention_scores.pkl"),
     "RANKING_PATH": os.path.join(RESULTS_FOLDER, "image_ranking.json"),

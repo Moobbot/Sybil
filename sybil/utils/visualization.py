@@ -25,6 +25,10 @@ def collate_attentions(
     Args:
         attention_dict (Dict[str, np.ndarray]): Dictionary containing attention maps.
         N (int): Number of images.
+        eps (float): Minimum threshold for attention values.
+
+    Returns:
+        np.ndarray: Collated attention maps.
     """
     a1 = attention_dict["image_attention_1"]
     v1 = attention_dict["volume_attention_1"]
@@ -65,13 +69,16 @@ def build_overlayed_images(
         gain (int): Factor to scale attention values.
         save_original (bool): If True, save original image when no significant attention.
                             If False, always create overlay even with minimal attention.
+
+    Returns:
+        List[np.ndarray]: List of overlayed images.
     """
     overlayed_images = []
     N = len(images)
     for i in range(N):
         if not save_original or np.any(attention[i] > viz_cfg["EPS"]):
-            # Tạo overlay cho mọi trường hợp nếu save_original=False
-            # hoặc khi có attention đáng kể nếu save_original=True
+            # Create overlay for all cases if save_original=False
+            # or when there is significant attention if save_original=True
             overlayed = np.zeros((512, 512, 3))
             overlayed[..., 2] = images[i]
             overlayed[..., 1] = images[i]
@@ -82,7 +89,7 @@ def build_overlayed_images(
             )
             overlayed_images.append(np.uint8(overlayed))
         else:
-            # Chỉ lưu ảnh gốc khi save_original=True và không có attention đáng kể
+            # Only save original image when save_original=True and no significant attention
             original = np.zeros((512, 512, 3))
             original[..., 0] = images[i]
             original[..., 1] = images[i]
@@ -97,15 +104,13 @@ def save_gif(img_list: List[np.ndarray], directory: str, name: str):
     Saves a list of images as a GIF in the specified directory with the given name.
 
     Args:
-        ``img_list`` (List[np.ndarray]): A list of numpy arrays representing the images to be saved.
-        ``directory`` (str): The directory where the GIF should be saved.
-        ``name`` (str): The name of the GIF file.
+        img_list (List[np.ndarray]): A list of numpy arrays representing the images to be saved.
+        directory (str): The directory where the GIF should be saved.
+        name (str): The name of the GIF file.
 
     Returns:
         None
     """
-    import imageio
-
     os.makedirs(directory, exist_ok=True)
     path = os.path.join(directory, f"{name}.gif")
     imageio.mimsave(path, img_list)
@@ -130,6 +135,17 @@ def save_attention_images(
 ):
     """
     Saves overlayed attention images as PNG or DICOM files.
+
+    Args:
+        overlayed_images (List[np.ndarray]): List of overlayed images to save.
+        cur_attention (np.ndarray): Current attention map.
+        save_path (str): Directory to save the images.
+        save_as_dicom (bool): Whether to save as DICOM format.
+        dicom_metadata_list (List[pydicom.Dataset]): List of DICOM metadata for each image.
+        input_files (List[str]): List of original input file paths.
+
+    Returns:
+        None
     """
     os.makedirs(save_path, exist_ok=True)
 
@@ -158,7 +174,7 @@ def save_attention_images(
 
         base_filename = f"pred_{patient_name}_{(N-1)-i:0{num_digits}d}"
 
-        # Thêm thông tin về loại ảnh vào tên file
+        # Add image type information to filename
         if mean_attention <= viz_cfg["EPS"]:
             base_filename = (
                 f"{base_filename}{viz_cfg['FILE_NAMING']['ORIGINAL_SUFFIX']}"
@@ -204,12 +220,11 @@ def visualize_attentions(
         attentions (List[Dict[str, np.ndarray]]): A list of attention maps per series.
         save_directory (Optional[str]): Directory to save the images. Defaults to None.
         gain (int): Factor to scale attention values for visualization. Defaults to 3.
-        attention_threshold (float): Minimum attention value to consider saving an image.
         save_as_dicom (bool): If True, saves images as DICOM instead of PNG.
-        dicom_metadata_list (Optional[List[pydicom.Dataset]]): Metadata list for DICOM images.
-        input_files (Optional[List[str]]): List of original input file paths.
         save_original (bool): If True, save original image when no significant attention.
                             If False, always create overlay. Defaults to False.
+        dicom_metadata_list (Optional[List[pydicom.Dataset]]): Metadata list for DICOM images.
+        input_files (Optional[List[str]]): List of original input file paths.
 
     Returns:
         List[List[np.ndarray]]: List of overlayed image lists per series.

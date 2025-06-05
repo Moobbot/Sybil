@@ -51,7 +51,7 @@ def load_model(model_name="sybil_ensemble"):
     Returns:
         Sybil: Model object has loaded.
     """
-    # Kiểm tra và tải checkpoints nếu cần
+    # Check and download checkpoints if needed
     if not all(os.path.exists(p) for p in MODEL_PATHS) or not os.path.exists(
         CALIBRATOR_PATH
     ):
@@ -189,8 +189,6 @@ def process_attention_scores(
         if score > 0:  # Only add images with attention score > 0
             # Calculate the reversed index as used in save_attention_images
             reversed_idx = (N - 1) - original_idx
-            # ! TODO: Cách tính id viec so sánh này có đúng không?
-            # ! - Màu đỏ của attention_scores có đúng không?
             # Ensure the index is valid for input_files
             if original_idx < len(input_files):
                 # Get original file name and info
@@ -213,10 +211,6 @@ def process_attention_scores(
                     {
                         "file_name_pred": pred_filename,
                         "attention_score": score,
-                        # "file_name_original": original_filename,
-                        # "rank": item["rank"],
-                        # "original_index": original_idx,
-                        # "reversed_index": reversed_idx,
                     }
                 )
             else:
@@ -291,7 +285,6 @@ def predict(
     logger.debug(f"Prediction finished. Results:\n{prediction_scores}")
 
     # Save predictions
-    # prediction_path = PREDICTION_CONFIG["PREDICTION_PATH"]
     prediction_path = os.path.join(output_dir, "prediction_scores.json")
     pred_dict = {"predictions": prediction.scores}
     with open(prediction_path, "w") as f:
@@ -318,7 +311,6 @@ def predict(
 
     # Process attention scores if requested
     if return_attentions:
-        # attention_path = PREDICTION_CONFIG["ATTENTION_PATH"]
         attention_path = os.path.join(output_dir, "attention_scores.pkl")
         with open(attention_path, "wb") as f:
             pickle.dump(prediction, f)
@@ -326,7 +318,6 @@ def predict(
         attention_info = process_attention_scores(prediction, serie, input_files)
 
         # Save rankings
-        # ranking_path = PREDICTION_CONFIG["RANKING_PATH"]
         ranking_path = os.path.join(output_dir, "image_ranking.json")
         with open(ranking_path, "w") as f:
             json.dump(attention_info, f, indent=2)
