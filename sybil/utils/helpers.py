@@ -1,6 +1,6 @@
-from sybil.datasets.validation import CSVDataset
-from sybil.datasets.nlst import *
 from sybil.datasets.mgh import MGH_Screening
+from sybil.datasets.nlst import *
+from sybil.datasets.validation import CSVDataset
 
 SUPPORTED_DATASETS = {
     "validation": CSVDataset,

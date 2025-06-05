@@ -1,24 +1,28 @@
+import copy
+import json
 import os
+import pickle
+import traceback
+import warnings
+from collections import Counter
 from posixpath import split
-import traceback, warnings
-import pickle, json
+
 import numpy as np
 import pydicom
-import torchio as tio
-from tqdm import tqdm
-from collections import Counter
 import torch
 import torch.nn.functional as F
+import torchio as tio
 from torch.utils import data
-from sybil.serie import Serie
-from sybil.utils.loading import get_sample_loader
+from tqdm import tqdm
+
+from sybil.datasets.nlst_risk_factors import NLSTRiskFactorVectorizer
 from sybil.datasets.utils import (
-    METAFILE_NOTFOUND_ERR,
     LOAD_FAIL_MSG,
+    METAFILE_NOTFOUND_ERR,
     VOXEL_SPACING,
 )
-import copy
-from sybil.datasets.nlst_risk_factors import NLSTRiskFactorVectorizer
+from sybil.serie import Serie
+from sybil.utils.loading import get_sample_loader
 
 METADATA_FILENAME = {"google_test": "NLST/full_nlst_google.json"}
 

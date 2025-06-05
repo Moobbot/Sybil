@@ -1,11 +1,11 @@
+import random
+from abc import ABCMeta, abstractmethod
+from typing import Literal
+
 import cv2
+import numpy as np
 import torch
 import torchvision
-
-from typing import Literal
-from abc import ABCMeta, abstractmethod
-import numpy as np
-import random
 
 try:
     import albumentations as A
@@ -117,9 +117,13 @@ class ResizeTransform:
     def __call__(self, image=None, mask=None):
         out = {"image": None, "mask": None}
         if image is not None:
-            out["image"] = cv2.resize(image, dsize=(self.width, self.height), interpolation=cv2.INTER_LINEAR)
+            out["image"] = cv2.resize(
+                image, dsize=(self.width, self.height), interpolation=cv2.INTER_LINEAR
+            )
         if mask is not None:
-            out["mask"] = cv2.resize(mask, dsize=(self.width, self.height), interpolation=cv2.INTER_NEAREST)
+            out["mask"] = cv2.resize(
+                mask, dsize=(self.width, self.height), interpolation=cv2.INTER_NEAREST
+            )
         return out
 
 

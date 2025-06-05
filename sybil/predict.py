@@ -16,12 +16,12 @@ import pickle
 import typing
 from typing import Literal
 
-from sybil.utils import logging_utils
-from sybil.datasets import utils
-from sybil.serie import Serie
-from sybil.model import Sybil
-from sybil.utils.visualization import visualize_attentions
 from sybil import __version__
+from sybil.datasets import utils
+from sybil.model import Sybil
+from sybil.serie import Serie
+from sybil.utils import logging_utils
+from sybil.utils.visualization import visualize_attentions
 
 
 def _get_parser():

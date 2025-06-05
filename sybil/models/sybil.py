@@ -1,9 +1,10 @@
 import torch
 import torch.nn as nn
 import torchvision
+
+from sybil.datasets.nlst_risk_factors import NLSTRiskFactorVectorizer
 from sybil.models.cumulative_probability_layer import Cumulative_Probability_Layer
 from sybil.models.pooling_layer import MultiAttentionPool
-from sybil.datasets.nlst_risk_factors import NLSTRiskFactorVectorizer
 
 
 class SybilNet(nn.Module):

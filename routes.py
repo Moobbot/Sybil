@@ -1,19 +1,21 @@
 import os
+import shutil
 import uuid
 import zipfile
-import shutil
-from flask import Blueprint, request, jsonify, send_file, send_from_directory
-from config import PREDICTION_CONFIG, PYTHON_ENV, RESULTS_FOLDER, UPLOAD_FOLDER
+
+from flask import Blueprint, jsonify, request, send_file, send_from_directory
+
 from call_model import load_model, predict
+from config import PREDICTION_CONFIG, PYTHON_ENV, RESULTS_FOLDER, UPLOAD_FOLDER
 from utils import (
-    save_uploaded_zip,
-    save_uploaded_files,
-    extract_zip_file,
-    dicom_to_png,
-    get_file_path,
-    get_valid_files,
-    get_overlay_files,
     create_zip_result,
+    dicom_to_png,
+    extract_zip_file,
+    get_file_path,
+    get_overlay_files,
+    get_valid_files,
+    save_uploaded_files,
+    save_uploaded_zip,
 )
 
 bp = Blueprint("routes", __name__)

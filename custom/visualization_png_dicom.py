@@ -1,14 +1,16 @@
 import os
+from typing import Dict, List, Union
+
 import cv2
 import imageio
 import numpy as np
 import pydicom
 import torch
 import torch.nn.functional as F
-from sybil.serie import Serie
-from typing import Dict, List, Union
-from pydicom.uid import ExplicitVRLittleEndian
 from PIL import Image
+from pydicom.uid import ExplicitVRLittleEndian
+
+from sybil.serie import Serie
 
 
 def collate_attentions(
@@ -174,10 +176,13 @@ def save_attention_images(
             print(f"Saved overlay PNG: {overlay_path}")
 
 
-from pydicom.uid import ExplicitVRLittleEndian, generate_uid
 from pydicom.dataset import Dataset, FileMetaDataset
+from pydicom.uid import ExplicitVRLittleEndian, generate_uid
 
-def convert_png_to_dicom(png_path: str, dicom_metadata: pydicom.Dataset, output_dicom_path: str):
+
+def convert_png_to_dicom(
+    png_path: str, dicom_metadata: pydicom.Dataset, output_dicom_path: str
+):
     """
     Chuyển đổi PNG overlay sang DICOM nhưng giữ RGB và điều chỉnh Window Level.
 
@@ -233,6 +238,7 @@ def convert_png_to_dicom(png_path: str, dicom_metadata: pydicom.Dataset, output_
 
     except Exception as e:
         print(f"⚠️ Error converting PNG to DICOM: {str(e)}")
+
 
 def save_attention_images_dicom(
     overlayed_images: List[np.ndarray],

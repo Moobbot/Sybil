@@ -29,7 +29,7 @@ VISUALIZATION_CONFIG = {
     # Cấu hình tên file
     "FILE_NAMING": {
         "PREDICTION_PREFIX": "pred_",
-        "ORIGINAL_SUFFIX": "", #_original
+        "ORIGINAL_SUFFIX": "",  # _original
         "DEFAULT_PATIENT": "Unknown_Patient",
     },
     # Cấu hình logging
