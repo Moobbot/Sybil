@@ -10,7 +10,7 @@ import numpy as np
 import pydicom
 from PIL import Image
 from werkzeug.utils import secure_filename
-from config import PYTHON_ENV, RESULTS_FOLDER, UPLOAD_FOLDER
+from config import PYTHON_ENV, RESULTS_FOLDER, UPLOAD_FOLDER, FILE_RETENTION
 
 
 def allowed_file(filename):
@@ -22,7 +22,7 @@ def allowed_file(filename):
     }
 
 
-def cleanup_old_results(folders, expiry_time=3600):
+def cleanup_old_results(folders, expiry_time=FILE_RETENTION):
     """
     Delete the old folder after a certain period of time.
 

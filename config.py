@@ -16,6 +16,7 @@ RESULTS_FOLDER = os.getenv(
 CLEANUP_FOLDER = os.getenv(
     "CLEANUP_FOLDER", os.path.join(os.path.dirname(__file__), "cleanup")
 )  # Results directory
+FILE_RETENTION = 3600
 CHECKPOINT_DIR = "sybil_checkpoints"
 ALLOWED_EXTENSIONS = {"dcm", "png", "jpg", "jpeg"}
 
