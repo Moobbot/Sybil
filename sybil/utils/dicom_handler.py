@@ -1,10 +1,12 @@
 import logging
 import os
-import numpy as np
-import pydicom
 from typing import List
 
+import numpy as np
+import pydicom
+
 from config import PYTHON_ENV
+
 from .config import VISUALIZATION_CONFIG as cfg
 
 

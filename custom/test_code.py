@@ -1,8 +1,9 @@
 import os
 
 import numpy as np
-from sybil import Sybil, Serie
-from sybil import visualize_attentions
+
+from sybil import Serie, Sybil, visualize_attentions
+
 name_or_path = []
 
 # Load the pretrained model

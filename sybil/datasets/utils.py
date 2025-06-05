@@ -1,5 +1,6 @@
-import numpy as np
 import math
+
+import numpy as np
 
 # Error Messages
 METAFILE_NOTFOUND_ERR = "Metadata file {} could not be parsed! Exception: {}!"
@@ -102,4 +103,3 @@ def get_scaled_annotation_area(sample, args):
         mask = get_scaled_annotation_mask(additional, args, scale_annotation=False)
         areas.append(mask.sum() / (mask.shape[0] * mask.shape[1]))
     return np.array(areas)
-

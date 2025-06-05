@@ -1,14 +1,15 @@
-import torch
-import os
-import sys
-import os.path
-import warnings
-from sybil.datasets.utils import get_scaled_annotation_mask, IMG_PAD_TOKEN
-from sybil.augmentations import ComposeAug
-import numpy as np
-from abc import ABCMeta, abstractmethod
 import hashlib
+import os
+import os.path
+import sys
+import warnings
+from abc import ABCMeta, abstractmethod
 
+import numpy as np
+import torch
+
+from sybil.augmentations import ComposeAug
+from sybil.datasets.utils import IMG_PAD_TOKEN, get_scaled_annotation_mask
 
 CACHED_FILES_EXT = ".png"
 DEFAULT_CACHE_DIR = "default/"

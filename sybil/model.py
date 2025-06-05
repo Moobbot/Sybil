@@ -1,22 +1,22 @@
+import os
 from argparse import Namespace
 from io import BytesIO
-import os
-from typing import NamedTuple, Union, Dict, List, Optional, Tuple
+from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 from urllib.request import urlopen
 from zipfile import ZipFile
 
-import torch
 import numpy as np
+import torch
 
-from sybil.serie import Serie
-from sybil.models.sybil import SybilNet
 from sybil.models.calibrator import SimpleClassifierGroup
-from sybil.utils.logging_utils import get_logger
+from sybil.models.sybil import SybilNet
+from sybil.serie import Serie
 from sybil.utils.device_utils import (
     get_default_device,
-    get_most_free_gpu,
     get_device_mem_info,
+    get_most_free_gpu,
 )
+from sybil.utils.logging_utils import get_logger
 
 # Leaving this here for a bit; these are IDs to download the models from Google Drive
 NAME_TO_FILE = {
@@ -392,6 +392,7 @@ class Sybil:
 
         """
         from sybil.utils.metrics import get_survival_metrics
+
         print("Evaluate called")
 
         if isinstance(series, Serie):

@@ -1,11 +1,13 @@
 import os
+from typing import Dict, List, Union
+
 import imageio
 import numpy as np
 import pydicom
 import torch
 import torch.nn.functional as F
+
 from sybil.serie import Serie
-from typing import Dict, List, Union
 
 
 def collate_attentions(
