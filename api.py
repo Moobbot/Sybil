@@ -1,12 +1,13 @@
 from flask import Flask
+
+from config import HOST_CONNECT, PORT_CONNECT, RESULTS_FOLDER, UPLOAD_FOLDER
 from routes import bp
 from utils import cleanup_old_results, get_local_ip
-from config import HOST_CONNECT, PORT_CONNECT, UPLOAD_FOLDER, RESULTS_FOLDER
 
 app = Flask(__name__)
 app.register_blueprint(bp)
 
-cleanup_old_results([UPLOAD_FOLDER, RESULTS_FOLDER])
+# cleanup_old_results([UPLOAD_FOLDER, RESULTS_FOLDER])
 
 if __name__ == "__main__":
     LOCAL_IP = get_local_ip()

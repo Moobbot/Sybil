@@ -1,11 +1,15 @@
 import os
 
-PYTHON_ENV = "develop" # "production"
+PYTHON_ENV = "develop"  # "production"
 # Cấu hình Flask
-PORT_CONNECT = 5555 # 5555
-HOST_CONNECT = "0.0.0.0" # "0.0.0.0"
-UPLOAD_FOLDER = "uploads"
-RESULTS_FOLDER = "results"
+PORT_CONNECT = 5555  # 5555
+HOST_CONNECT = "0.0.0.0"  # "0.0.0.0"
+UPLOAD_FOLDER = os.getenv(
+    "UPLOAD_FOLDER", "../backend/src/data/dicom/uploads"
+)  # Thư mục tải lên
+RESULTS_FOLDER = os.getenv(
+    "RESULTS_FOLDER", "../backend/src/data/dicom/results"
+)  # Thư mục kết quả
 CHECKPOINT_DIR = "sybil_checkpoints"
 ALLOWED_EXTENSIONS = {"dcm", "png", "jpg", "jpeg"}
 
@@ -50,7 +54,7 @@ MODEL_CONFIG = {
 }
 
 PREDICTION_CONFIG = {
-    "OVERLAY_PATH": "overlay", # "serie_0"
+    "OVERLAY_PATH": "overlay",  # "serie_0"
     "PREDICTION_PATH": os.path.join(RESULTS_FOLDER, "prediction_scores.json"),
     "ATTENTION_PATH": os.path.join(RESULTS_FOLDER, "attention_scores.pkl"),
     "RANKING_PATH": os.path.join(RESULTS_FOLDER, "image_ranking.json"),
