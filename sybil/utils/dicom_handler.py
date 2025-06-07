@@ -2,9 +2,8 @@ import logging
 import os
 import numpy as np
 import pydicom
-from typing import List
 
-from config import PYTHON_ENV
+from config import ENV
 from .config import VISUALIZATION_CONFIG as cfg
 
 
@@ -60,12 +59,12 @@ class DicomHandler:
             dicom_path = os.path.join(save_path, f"{base_filename}.dcm")
             ds.save_as(dicom_path)
             logging.info(f"✅ Successfully saved DICOM overlay: {dicom_path}")
-            if PYTHON_ENV == "develop":
+            if ENV == "develop":
                 print(f"✅ Saved DICOM overlay (RGB): {dicom_path}")
             return True
 
         except Exception as e:
             logging.error(f"⚠️ Error saving DICOM file: {str(e)}")
-            if PYTHON_ENV == "develop":
+            if ENV == "develop":
                 print(f"⚠️ Error saving DICOM file: {str(e)}")
             return False
