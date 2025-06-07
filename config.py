@@ -1,37 +1,41 @@
 import os
+from pathlib import Path
 
-PYTHON_ENV = os.getenv("PYTHON_ENV", "develop")  # "production"
+# Environment Configuration
+ENV_DEFAULT = "develop"
+ENV = os.getenv("PYTHON_ENV", ENV_DEFAULT)
+IS_DEV = ENV == "develop"
 
-# Flask configuration
-PORT_CONNECT = int(os.getenv("PORT_CONNECT", 5555))
-HOST_CONNECT = "0.0.0.0"  # "0.0.0.0"
+# Server Configuration
+HOST_CONNECT_DEFAULT = "0.0.0.0"
+PORT_CONNECT_DEFAULT = 5555
+HOST_CONNECT = os.getenv("HOST_CONNECT", HOST_CONNECT_DEFAULT)
+PORT_CONNECT = int(os.getenv("PORT_CONNECT", PORT_CONNECT_DEFAULT))
 
-# Upload and results directories - support both relative and absolute paths
-UPLOAD_FOLDER = os.getenv(
-    "UPLOAD_FOLDER", os.path.join(os.path.dirname(__file__), "uploads")
-)  # Upload directory
-RESULTS_FOLDER = os.getenv(
-    "RESULTS_FOLDER", os.path.join(os.path.dirname(__file__), "results")
-)  # Results directory
-CLEANUP_FOLDER = os.getenv(
-    "CLEANUP_FOLDER", os.path.join(os.path.dirname(__file__), "cleanup")
-)  # Results directory
-FILE_RETENTION = 3600
-CHECKPOINT_DIR = "sybil_checkpoints"
+# Base Directory Configuration
+BASE_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
+
+# Folder Configuration
+FOLDERS = {
+    "UPLOAD": os.getenv("UPLOAD_FOLDER", os.path.join(BASE_DIR, "uploads")),
+    "RESULTS": os.getenv("RESULTS_FOLDER", os.path.join(BASE_DIR, "results")),
+    "CLEANUP": os.getenv("CLEANUP_FOLDER", os.path.join(BASE_DIR, "cleanup")),
+    "CHECKPOINT": os.path.join(BASE_DIR, "sybil_checkpoints"),
+}
+
+# Create necessary directories
+for folder in FOLDERS.values():
+    os.makedirs(folder, exist_ok=True)
+
+# File Configuration
+FILE_RETENTION = int(os.getenv("FILE_RETENTION", 3600))  # 1 hour
 ALLOWED_EXTENSIONS = {"dcm", "png", "jpg", "jpeg"}
 
-# Create directories if they don't exist
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(RESULTS_FOLDER, exist_ok=True)
-os.makedirs(CLEANUP_FOLDER, exist_ok=True)
-os.makedirs(CHECKPOINT_DIR, exist_ok=True)
-
-# Checkpoint download URL
+# Model Configuration
 CHECKPOINT_URL = "https://dl.dropboxusercontent.com/scl/fi/56p7wa6ose6yxuzvj5ejh/sybil_checkpoints.zip?rlkey=13zvrawog90y6ntfst80sveg8&dl=1"
 
-# List of model checkpoints
 MODEL_PATHS = [
-    os.path.join(CHECKPOINT_DIR, f"{model}.ckpt")
+    os.path.join(FOLDERS["CHECKPOINT"], f"{model}.ckpt")
     for model in [
         "28a7cd44f5bcd3e6cc760b65c7e0d54d",
         "56ce1a7d241dc342982f5466c4a9d7ef",
@@ -41,19 +45,8 @@ MODEL_PATHS = [
     ]
 ]
 
-CALIBRATOR_PATH = os.path.join(CHECKPOINT_DIR, "sybil_ensemble_simple_calibrator.json")
+CALIBRATOR_PATH = os.path.join(FOLDERS["CHECKPOINT"], "sybil_ensemble_simple_calibrator.json")
 
-# Visualization configuration
-VISUALIZATION_CONFIG = {
-    # Attention ranking configuration
-    "RANKING": {
-        "DEFAULT_RETURN_TYPE": "top",  # 'all', 'top', or 'none'
-        "DEFAULT_TOP_K": 6,  # Default number of top images
-        # "MIN_SCORE": 0.0,  # Minimum attention score threshold
-    },
-}
-
-# Model configuration
 MODEL_CONFIG = {
     "RETURN_ATTENTIONS_DEFAULT": True,
     "WRITE_ATTENTION_IMAGES_DEFAULT": True,
@@ -61,10 +54,54 @@ MODEL_CONFIG = {
     "SAVE_ORIGINAL_DEFAULT": True,
 }
 
-# Prediction configuration - support both relative and absolute paths
+# Visualization Configuration
+VISUALIZATION_CONFIG = {
+    "RANKING": {
+        "DEFAULT_RETURN_TYPE": "top",  # 'all', 'top', or 'none'
+        "DEFAULT_TOP_K": 6,  # Default number of top images
+    },
+}
+
+# Prediction Configuration
 PREDICTION_CONFIG = {
     "OVERLAY_PATH": "overlay",
-    "PREDICTION_PATH": os.path.join(RESULTS_FOLDER, "prediction_scores.json"),
-    "ATTENTION_PATH": os.path.join(RESULTS_FOLDER, "attention_scores.pkl"),
-    "RANKING_PATH": os.path.join(RESULTS_FOLDER, "image_ranking.json"),
+    "PREDICTION_PATH": os.path.join(FOLDERS["RESULTS"], "prediction_scores.json"),
+    "ATTENTION_PATH": os.path.join(FOLDERS["RESULTS"], "attention_scores.pkl"),
+    "RANKING_PATH": os.path.join(FOLDERS["RESULTS"], "image_ranking.json"),
+}
+
+# Logging Configuration
+LOG_CONFIG = {
+    "FILE": os.path.join(BASE_DIR, "logs", f"sybil_{ENV}.log"),
+    "FORMAT": "%(asctime)s - %(levelname)s - [%(name)s] - %(message)s",
+    "LEVEL": os.getenv("LOG_LEVEL", "DEBUG" if IS_DEV else "INFO"),
+    "CONSOLE": IS_DEV,
+    "MAX_BYTES": 10485760,  # 10MB
+    "BACKUP_COUNT": 5,
+}
+
+# Error Messages
+ERROR_MESSAGES = {
+    "invalid_file": f"Invalid file format. Only {', '.join(ALLOWED_EXTENSIONS)} files are allowed.",
+    "processing_error": "Error processing the files. Please check the file format and try again.",
+    "server_error": "Internal server error. Please try again later.",
+    "file_not_found": "Requested file not found.",
+}
+
+# Cleanup Configuration
+CLEANUP_CONFIG = {
+    "ENABLED": True,
+    "INTERVAL_HOURS": 3,
+    "MAX_AGE_DAYS": 1,
+    "PATTERNS": {
+        "UPLOAD": f"*.{ext}" for ext in ALLOWED_EXTENSIONS
+    },
+}
+
+# Security Configuration
+SECURITY_CONFIG = {
+    "ALLOWED_IPS": ["127.0.0.1", "192.168.1.0/24", "10.0.0.0/8"],
+    "CORS_ORIGINS": ["*"] if IS_DEV else ["https://example.com"],
+    "CORS_METHODS": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    "CORS_HEADERS": ["*"],
 }

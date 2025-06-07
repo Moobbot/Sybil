@@ -6,19 +6,17 @@ import urllib
 import zipfile
 from typing import Dict, Literal
 
-import numpy as np
 import pydicom
 from flask import logging
 
 from config import (
     CALIBRATOR_PATH,
-    CHECKPOINT_DIR,
     CHECKPOINT_URL,
+    FOLDERS,
     MODEL_CONFIG,
     MODEL_PATHS,
-    PREDICTION_CONFIG,
+    VISUALIZATION_CONFIG as cfg,
 )
-from config import VISUALIZATION_CONFIG as cfg
 from sybil.datasets import utils as utils_datasets
 from sybil.model import Sybil
 from sybil.serie import Serie
@@ -29,16 +27,16 @@ from sybil.utils.visualization import rank_images_by_attention, visualize_attent
 
 def download_checkpoints():
     """Download and extract checkpoint if not exist."""
-    if not os.path.exists(CHECKPOINT_DIR) or not all(
+    if not os.path.exists(FOLDERS["CHECKPOINT"]) or not all(
         os.path.exists(p) for p in MODEL_PATHS
     ):
         print(f"Downloading checkpoints from {CHECKPOINT_URL}...")
-        zip_path = os.path.join(CHECKPOINT_DIR, "sybil_checkpoints.zip")
+        zip_path = os.path.join(FOLDERS["CHECKPOINT"], "sybil_checkpoints.zip")
         urllib.request.urlretrieve(CHECKPOINT_URL, zip_path)
 
         print("Extracting checkpoints...")
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            zip_ref.extractall(CHECKPOINT_DIR)
+            zip_ref.extractall(FOLDERS["CHECKPOINT"])
         os.remove(zip_path)
         print("Checkpoints downloaded and extracted successfully.")
 

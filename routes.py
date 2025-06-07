@@ -5,7 +5,7 @@ import uuid
 from flask import Blueprint, jsonify, request, send_file, send_from_directory
 
 from call_model import load_model, predict
-from config import PYTHON_ENV, RESULTS_FOLDER, UPLOAD_FOLDER, CLEANUP_FOLDER
+from config import FOLDERS, IS_DEV
 from utils import (
     cleanup_old_results,
     create_zip_result,
@@ -39,7 +39,7 @@ def api_predict():
     if not session_id:
         return jsonify({"error": "Missing session_id"}), 400
 
-    unzip_path = os.path.join(UPLOAD_FOLDER, session_id)
+    unzip_path = os.path.join(FOLDERS["UPLOAD"], session_id)
     if not os.path.exists(unzip_path):
         return jsonify({"error": f"Session folder not found: {unzip_path}"}), 404
 
@@ -47,7 +47,7 @@ def api_predict():
     if not valid_files:
         return jsonify({"error": "No valid files found in the session folder"}), 400
 
-    output_dir = os.path.join(RESULTS_FOLDER, session_id, "sybil")
+    output_dir = os.path.join(FOLDERS["RESULTS"], session_id, "sybil")
     os.makedirs(output_dir, exist_ok=True)
     print(f"Session ID: {session_id}, Output directory: {output_dir}")
 
@@ -61,7 +61,7 @@ def api_predict():
         "attention_info": attention_info,
         "message": "Prediction successful.",
     }
-    if PYTHON_ENV == "develop":
+    if IS_DEV:
         print(f"Response: {response}")
     return jsonify(response)
 
@@ -78,7 +78,7 @@ def api_predict_file():
     """
     print("API predict called")
 
-    cleanup_old_results([CLEANUP_FOLDER])
+    cleanup_old_results([FOLDERS["CLEANUP"]])
 
     files = request.files.getlist("file")
 
@@ -90,12 +90,12 @@ def api_predict_file():
 
     # Save the files & get the list of uploaded files
     uploaded_files, upload_path = save_uploaded_files(
-        files, session_id, folder_save=CLEANUP_FOLDER
+        files, session_id, folder_save=FOLDERS["CLEANUP"]
     )
     if not uploaded_files:
         return jsonify({"error": "No valid files uploaded"}), 400
 
-    output_dir = os.path.join(CLEANUP_FOLDER, session_id)
+    output_dir = os.path.join(FOLDERS["CLEANUP"], session_id)
     os.makedirs(output_dir, exist_ok=True)
     print(f"Session ID: {session_id}, Output directory: {output_dir}")
 
@@ -146,7 +146,7 @@ def api_predict_zip():
         JSON: Prediction results including the ZIP download link and attention information
     """
     # Clean up old results before processing
-    cleanup_old_results([CLEANUP_FOLDER])
+    cleanup_old_results([FOLDERS["CLEANUP"]])
 
     file = request.files.get("file")
     if not file or file.filename == "":
@@ -159,11 +159,11 @@ def api_predict_zip():
     session_id = str(uuid.uuid4())
 
     # Save the uploaded ZIP file to CLEANUP_FOLDER
-    zip_path = save_uploaded_zip(file, session_id, folder_save=CLEANUP_FOLDER)
+    zip_path = save_uploaded_zip(file, session_id, folder_save=FOLDERS["CLEANUP"])
 
     # Unzip the ZIP file to CLEANUP_FOLDER
     unzip_path, error_response, status_code = extract_zip_file(
-        zip_path, session_id, folder_save=CLEANUP_FOLDER
+        zip_path, session_id, folder_save=FOLDERS["CLEANUP"]
     )
     if error_response:
         return error_response, status_code
@@ -175,7 +175,7 @@ def api_predict_zip():
         return jsonify({"error": "No valid files found in the ZIP archive"}), 400
 
     # The directory to save the prediction results
-    output_dir = os.path.join(CLEANUP_FOLDER, session_id)
+    output_dir = os.path.join(FOLDERS["CLEANUP"], session_id)
     os.makedirs(output_dir, exist_ok=True)
     print(f"Session ID: {session_id}, Output directory: {output_dir}")
 
@@ -200,7 +200,7 @@ def api_predict_zip():
     # Zip the prediction results
     try:
         zip_path = create_zip_result(
-            overlay_images_link, session_id, folder_save=CLEANUP_FOLDER
+            overlay_images_link, session_id, folder_save=FOLDERS["CLEANUP"]
         )
         print(f"Created zip file at: {zip_path}")
 
@@ -226,7 +226,7 @@ def api_predict_zip():
         "attention_info": attention_info,
         "message": "Prediction successful.",
     }
-    if PYTHON_ENV == "develop":
+    if IS_DEV:
         print(f"Response: {response}")
     return jsonify(response)
 
@@ -284,7 +284,7 @@ def download_file(session_id, filename):
 @bp.route("/download_zip/<session_id>", methods=["GET"])
 def download_zip(session_id):
     """API to download Overlay image according to Session ID."""
-    file_path = os.path.join(CLEANUP_FOLDER, session_id + ".zip")
+    file_path = os.path.join(FOLDERS["CLEANUP"], session_id + ".zip")
     if os.path.exists(file_path):
         print(f"✅ File found: {file_path}, preparing download...")
         return send_file(file_path, as_attachment=True)
@@ -299,7 +299,7 @@ def download_zip(session_id):
 @bp.route("/preview/<session_id>/<filename>", methods=["GET"])
 def preview_file(session_id, filename):
     """API to preview overlay photos"""
-    overlay_dir = os.path.join(RESULTS_FOLDER, session_id)
+    overlay_dir = os.path.join(FOLDERS["RESULTS"], session_id)
     # PREDICTION_CONFIG["OVERLAY_PATH"]
     file_path = os.path.join(overlay_dir, filename)
 
