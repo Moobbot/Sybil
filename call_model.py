@@ -1,43 +1,42 @@
+import json
 import os
 import pickle
 import typing
 import urllib
 import zipfile
-import json
-from flask import logging
-import numpy as np
-from typing import Literal, Dict
+from typing import Dict, Literal
 
 import pydicom
+from flask import logging
+
 from config import (
-    CHECKPOINT_DIR,
+    CALIBRATOR_PATH,
     CHECKPOINT_URL,
+    FOLDERS,
     MODEL_CONFIG,
     MODEL_PATHS,
-    CALIBRATOR_PATH,
-    PREDICTION_CONFIG,
-    VISUALIZATION_CONFIG as cfg,
 )
+from config import VISUALIZATION_CONFIG as cfg
 from sybil.datasets import utils as utils_datasets
 from sybil.model import Sybil
 from sybil.serie import Serie
 from sybil.utils import logging_utils
-from sybil.utils.visualization import visualize_attentions, rank_images_by_attention
 from sybil.utils.config import VISUALIZATION_CONFIG as vsl_config
+from sybil.utils.visualization import rank_images_by_attention, visualize_attentions
 
 
 def download_checkpoints():
     """Download and extract checkpoint if not exist."""
-    if not os.path.exists(CHECKPOINT_DIR) or not all(
+    if not os.path.exists(FOLDERS["CHECKPOINT"]) or not all(
         os.path.exists(p) for p in MODEL_PATHS
     ):
         print(f"Downloading checkpoints from {CHECKPOINT_URL}...")
-        zip_path = os.path.join(CHECKPOINT_DIR, "sybil_checkpoints.zip")
+        zip_path = os.path.join(FOLDERS["CHECKPOINT"], "sybil_checkpoints.zip")
         urllib.request.urlretrieve(CHECKPOINT_URL, zip_path)
 
         print("Extracting checkpoints...")
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            zip_ref.extractall(CHECKPOINT_DIR)
+            zip_ref.extractall(FOLDERS["CHECKPOINT"])
         os.remove(zip_path)
         print("Checkpoints downloaded and extracted successfully.")
 
@@ -50,7 +49,7 @@ def load_model(model_name="sybil_ensemble"):
     Returns:
         Sybil: Model object has loaded.
     """
-    # Kiểm tra và tải checkpoints nếu cần
+    # Check and download checkpoints if needed
     if not all(os.path.exists(p) for p in MODEL_PATHS) or not os.path.exists(
         CALIBRATOR_PATH
     ):
@@ -188,8 +187,6 @@ def process_attention_scores(
         if score > 0:  # Only add images with attention score > 0
             # Calculate the reversed index as used in save_attention_images
             reversed_idx = (N - 1) - original_idx
-            # ! TODO: Cách tính id viec so sánh này có đúng không?
-            # ! - Màu đỏ của attention_scores có đúng không?
             # Ensure the index is valid for input_files
             if original_idx < len(input_files):
                 # Get original file name and info
@@ -212,10 +209,6 @@ def process_attention_scores(
                     {
                         "file_name_pred": pred_filename,
                         "attention_score": score,
-                        # "file_name_original": original_filename,
-                        # "rank": item["rank"],
-                        # "original_index": original_idx,
-                        # "reversed_index": reversed_idx,
                     }
                 )
             else:
@@ -290,7 +283,7 @@ def predict(
     logger.debug(f"Prediction finished. Results:\n{prediction_scores}")
 
     # Save predictions
-    prediction_path = PREDICTION_CONFIG["PREDICTION_PATH"]
+    prediction_path = os.path.join(output_dir, "prediction_scores.json")
     pred_dict = {"predictions": prediction.scores}
     with open(prediction_path, "w") as f:
         json.dump(pred_dict, f, indent=2)
@@ -302,26 +295,28 @@ def predict(
     dicom_metadata_list = []
     if file_type == "dicom":
         # First, load all DICOM metadata
-        dicom_metadata_dict = {os.path.normpath(f): pydicom.dcmread(f) for f in input_files}
-        
+        dicom_metadata_dict = {
+            os.path.normpath(f): pydicom.dcmread(f) for f in input_files
+        }
+
         # Then, reorder according to the serie's ordered paths
         # This ensures dicom_metadata_list matches the order of images in serie
         ordered_paths = [os.path.normpath(path) for path in serie._meta.paths]
         dicom_metadata_list = [dicom_metadata_dict[path] for path in ordered_paths]
-        
+
         if not dicom_metadata_list:
             logging.warning("⚠️ No DICOM metadata could be loaded from input files")
 
     # Process attention scores if requested
     if return_attentions:
-        attention_path = PREDICTION_CONFIG["ATTENTION_PATH"]
+        attention_path = os.path.join(output_dir, "attention_scores.pkl")
         with open(attention_path, "wb") as f:
             pickle.dump(prediction, f)
 
         attention_info = process_attention_scores(prediction, serie, input_files)
 
         # Save rankings
-        ranking_path = PREDICTION_CONFIG["RANKING_PATH"]
+        ranking_path = os.path.join(output_dir, "image_ranking.json")
         with open(ranking_path, "w") as f:
             json.dump(attention_info, f, indent=2)
 

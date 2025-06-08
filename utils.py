@@ -1,28 +1,25 @@
 import base64
 import io
 import os
-import time
 import shutil
 import socket
+import time
 import zipfile
-from flask import jsonify
+
 import numpy as np
 import pydicom
+from flask import jsonify
 from PIL import Image
 from werkzeug.utils import secure_filename
-from config import PREDICTION_CONFIG, PYTHON_ENV, RESULTS_FOLDER, UPLOAD_FOLDER
+
+from config import ALLOWED_EXTENSIONS, ENV, FILE_RETENTION, FOLDERS
 
 
 def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in {
-        "dcm",
-        "png",
-        "jpg",
-        "jpeg",
-    }
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-def cleanup_old_results(folders, expiry_time=3600):
+def cleanup_old_results(folders, expiry_time=FILE_RETENTION):
     """
     Delete the old folder after a certain period of time.
 
@@ -78,41 +75,46 @@ def dicom_to_png(dicom_file):
     return img_base64
 
 
-def save_uploaded_files(files, session_id):
-    """Save the files uploaded by session_id"""
-    upload_path = os.path.join(UPLOAD_FOLDER, session_id)
-    os.makedirs(upload_path, exist_ok=True)
+def save_uploaded_files(files, session_id, folder_save=FOLDERS["UPLOAD"]):
+    """Save uploaded files to the specified folder
+
+    Args:
+        files (list): List of uploaded files
+        session_id (str): Session ID for the upload
+        folder_save (str): Folder to save the files to
+
+    Returns:
+        tuple: (list of saved files, path to saved files)
+    """
     uploaded_files = []
+    upload_path = os.path.join(folder_save, session_id)
+    os.makedirs(upload_path, exist_ok=True)
 
     for file in files:
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file_path = os.path.join(upload_path, filename)
             file.save(file_path)
-            uploaded_files.append(file_path)
-            print(f"Uploaded file: {filename}")
+            uploaded_files.append(filename)
 
     return uploaded_files, upload_path
 
 
 def get_file_path(session_id, filename):
     """Trả về đường dẫn đầy đủ của file trong thư mục kết quả."""
-    return os.path.join(RESULTS_FOLDER, session_id, "serie_0", filename)
+    return os.path.join(FOLDERS["RESULTS"], session_id, "serie_0", filename)
 
 
 def get_overlay_files(output_dir, session_id):
-    """Lấy danh sách ảnh overlay trong thư mục 'serie_0'."""
-    overlay_dir = os.path.join(output_dir, "serie_0")
-    # PREDICTION_CONFIG["OVERLAY_PATH"]
-
-    if not os.path.exists(overlay_dir) or not os.listdir(overlay_dir):
+    """Lấy danh sách ảnh overlay trong thư mục session."""
+    if not os.path.exists(output_dir) or not os.listdir(output_dir):
         print(f"⚠️ No overlay images found for session {session_id}")
         return []
 
     return [
         img
-        for img in os.listdir(overlay_dir)
-        if os.path.isfile(os.path.join(overlay_dir, img))
+        for img in os.listdir(output_dir)
+        if os.path.isfile(os.path.join(output_dir, img)) and img.endswith(".dcm")
     ]
 
 
@@ -127,14 +129,14 @@ def get_local_ip():
     return ip_address
 
 
-def save_uploaded_zip(file, session_id, folder_save=UPLOAD_FOLDER):
+def save_uploaded_zip(file, session_id, folder_save=FOLDERS["UPLOAD"]):
     """Lưu file ZIP tải lên"""
     zip_path = os.path.join(folder_save, f"{session_id}.zip")
     file.save(zip_path)
     return zip_path
 
 
-def extract_zip_file(zip_path, session_id, folder_save=UPLOAD_FOLDER):
+def extract_zip_file(zip_path, session_id, folder_save=FOLDERS["UPLOAD"]):
     """Giải nén ZIP, kiểm tra thư mục con"""
     unzip_path = os.path.join(folder_save, session_id)
     os.makedirs(unzip_path, exist_ok=True)
@@ -169,10 +171,10 @@ def get_valid_files(unzip_path):
     return valid_files
 
 
-def create_zip_result(output_dir, session_id, folder_save=RESULTS_FOLDER):
+def create_zip_result(output_dir, session_id, folder_save=FOLDERS["RESULTS"]):
     """Nén ảnh dự đoán thành file ZIP"""
     result_zip_path = os.path.join(folder_save, f"{session_id}.zip")
-    if PYTHON_ENV == "develop":
+    if ENV == "develop":
         print(f"Creating zip file from {output_dir} to {result_zip_path}")
 
     with zipfile.ZipFile(result_zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
@@ -182,6 +184,6 @@ def create_zip_result(output_dir, session_id, folder_save=RESULTS_FOLDER):
                 arcname = os.path.relpath(file_path, output_dir)
                 zipf.write(file_path, arcname)
 
-    if PYTHON_ENV == "develop":
+    if ENV == "develop":
         print(f"Zip file size: {os.path.getsize(result_zip_path)} bytes")
     return result_zip_path
