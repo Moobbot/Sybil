@@ -5,11 +5,6 @@ WORKDIR /app
 # Cài đặt các thư viện hệ thống cần thiết
 RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
 
-# Tạo và sử dụng virtual environment
-ENV VIRTUAL_ENV=/opt/venv
-RUN python3 -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
 # Cập nhật pip lên phiên bản 24.0
 RUN pip install --upgrade pip==24.0
 
@@ -20,6 +15,11 @@ RUN python setup.py
 
 COPY . .
 
+# Thiết lập biến môi trường cho ứng dụng
+ENV HOST_CONNECT=0.0.0.0 \
+    PORT=5555 \
+    ENV=prod \
+    DEVICE=cuda
 
 EXPOSE 5555
 
