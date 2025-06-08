@@ -1,16 +1,18 @@
 import base64
 import io
 import os
-import time
 import shutil
 import socket
+import time
 import zipfile
-from flask import jsonify
+
 import numpy as np
 import pydicom
+from flask import jsonify
 from PIL import Image
 from werkzeug.utils import secure_filename
-from config import ENV, FOLDERS, FILE_RETENTION, ALLOWED_EXTENSIONS
+
+from config import ALLOWED_EXTENSIONS, ENV, FILE_RETENTION, FOLDERS
 
 
 def allowed_file(filename):
@@ -112,7 +114,7 @@ def get_overlay_files(output_dir, session_id):
     return [
         img
         for img in os.listdir(output_dir)
-        if os.path.isfile(os.path.join(output_dir, img)) and img.endswith('.dcm')
+        if os.path.isfile(os.path.join(output_dir, img)) and img.endswith(".dcm")
     ]
 
 

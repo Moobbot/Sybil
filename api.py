@@ -1,6 +1,6 @@
 from flask import Flask
 
-from config import HOST_CONNECT, PORT_CONNECT, IS_DEV
+from config import HOST_CONNECT, IS_DEV, PORT_CONNECT
 from routes import bp
 
 # from utils import cleanup_old_results

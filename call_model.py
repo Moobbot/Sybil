@@ -15,8 +15,8 @@ from config import (
     FOLDERS,
     MODEL_CONFIG,
     MODEL_PATHS,
-    VISUALIZATION_CONFIG as cfg,
 )
+from config import VISUALIZATION_CONFIG as cfg
 from sybil.datasets import utils as utils_datasets
 from sybil.model import Sybil
 from sybil.serie import Serie

@@ -45,7 +45,9 @@ MODEL_PATHS = [
     ]
 ]
 
-CALIBRATOR_PATH = os.path.join(FOLDERS["CHECKPOINT"], "sybil_ensemble_simple_calibrator.json")
+CALIBRATOR_PATH = os.path.join(
+    FOLDERS["CHECKPOINT"], "sybil_ensemble_simple_calibrator.json"
+)
 
 MODEL_CONFIG = {
     "RETURN_ATTENTIONS_DEFAULT": True,
@@ -93,9 +95,7 @@ CLEANUP_CONFIG = {
     "ENABLED": True,
     "INTERVAL_HOURS": 3,
     "MAX_AGE_DAYS": 1,
-    "PATTERNS": {
-        "UPLOAD": f"*.{ext}" for ext in ALLOWED_EXTENSIONS
-    },
+    "PATTERNS": {"UPLOAD": f"*.{ext}" for ext in ALLOWED_EXTENSIONS},
 }
 
 # Security Configuration

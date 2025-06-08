@@ -1,9 +1,11 @@
 import logging
 import os
+
 import numpy as np
 import pydicom
 
 from config import ENV
+
 from .config import VISUALIZATION_CONFIG as cfg
 
 
