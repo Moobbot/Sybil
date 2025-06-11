@@ -2,20 +2,26 @@ FROM python:3.10
 
 WORKDIR /app
 
-# Cài đặt các thư viện hệ thống cần thiết
-RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Cập nhật pip lên phiên bản 24.0
+# Upgrade pip
 RUN pip install --upgrade pip==24.0
 
-COPY requirements.txt setup.py .
+# Copy only requirements first to leverage Docker cache
+COPY requirements.txt setup.py ./
 
-# Cài đặt dependencies từ setup.py
+# Install dependencies
 RUN python setup.py
 
+# Copy the rest of the application
 COPY . .
 
-# Thiết lập biến môi trường cho ứng dụng
+# Set environment variables
 ENV HOST_CONNECT=0.0.0.0 \
     PORT=5555 \
     ENV=prod \
