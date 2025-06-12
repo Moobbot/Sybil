@@ -32,7 +32,7 @@ FILE_RETENTION = int(os.getenv("FILE_RETENTION", 3600))  # 1 hour
 ALLOWED_EXTENSIONS = {"dcm", "png", "jpg", "jpeg"}
 
 # Model Configuration
-CHECKPOINT_URL = "https://dl.dropboxusercontent.com/scl/fi/56p7wa6ose6yxuzvj5ejh/sybil_checkpoints.zip?rlkey=13zvrawog90y6ntfst80sveg8&dl=1"
+CHECKPOINT_URL = "https://github.com/Moobbot/Sybil/releases/download/1.8.3/sybil_checkpoints.zip"
 
 MODEL_PATHS = [
     os.path.join(FOLDERS["CHECKPOINT"], f"{model}.ckpt")
