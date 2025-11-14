@@ -1,6 +1,9 @@
 import os
 import shutil
 import uuid
+import csv
+import zipfile
+from datetime import datetime
 
 from flask import Blueprint, jsonify, request, send_file, send_from_directory
 
@@ -338,3 +341,272 @@ def download_gif(session_id):
         ),
         404,
     )
+
+
+@bp.route("/api_batch_process", methods=["POST"])
+def api_batch_process():
+    """
+    API xử lý batch: đọc tuần tự từng subfolder trong folder được chọn và thực hiện dự đoán.
+    
+    Request body:
+    {
+        "folder_path": "C:/path/to/folder/containing/subfolders"
+    }
+    
+    Returns:
+        ZIP file chứa các CSV files (mỗi subfolder 1 CSV với kết quả từng ảnh) 
+        và 1 file summary CSV tổng hợp
+    """
+    print("API batch process called")
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({"error": "Missing request body"}), 400
+    
+    folder_path = data.get("folder_path")
+    if not folder_path:
+        return jsonify({"error": "Missing folder_path"}), 400
+    
+    # Kiểm tra folder có tồn tại không
+    if not os.path.exists(folder_path):
+        return jsonify({"error": f"Folder not found: {folder_path}"}), 404
+    
+    if not os.path.isdir(folder_path):
+        return jsonify({"error": f"Path is not a directory: {folder_path}"}), 400
+    
+    # Kiểm tra model có sẵn không
+    if model is None:
+        return jsonify({"error": "Model not loaded"}), 500
+    
+    # Lấy danh sách các subfolder
+    subfolders = []
+    for item in os.listdir(folder_path):
+        item_path = os.path.join(folder_path, item)
+        if os.path.isdir(item_path):
+            subfolders.append(item_path)
+    
+    if not subfolders:
+        return jsonify({"error": "No subfolders found in the specified folder"}), 400
+    
+    print(f"Found {len(subfolders)} subfolders to process")
+    
+    # Tạo thư mục kết quả cho batch processing
+    batch_session_id = f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    batch_result_dir = os.path.join(FOLDERS["CLEANUP"], batch_session_id)
+    os.makedirs(batch_result_dir, exist_ok=True)
+    
+    # Danh sách CSV files đã tạo
+    csv_files = []
+    summary_results = []
+    
+    # Xử lý từng subfolder tuần tự
+    for idx, subfolder_path in enumerate(subfolders, 1):
+        subfolder_name = os.path.basename(subfolder_path)
+        print(f"Processing subfolder {idx}/{len(subfolders)}: {subfolder_name}")
+        
+        try:
+            # Kiểm tra file hợp lệ trong subfolder
+            valid_files = get_valid_files(subfolder_path)
+            
+            if not valid_files:
+                print(f"Warning: No valid files found in subfolder: {subfolder_name}")
+                # Tạo CSV rỗng cho subfolder này
+                csv_filename = f"{subfolder_name}_results.csv"
+                csv_path = os.path.join(batch_result_dir, csv_filename)
+                with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
+                    writer = csv.DictWriter(
+                        csvfile,
+                        fieldnames=["file_name", "attention_score", "status", "error_message"]
+                    )
+                    writer.writeheader()
+                    writer.writerow({
+                        "file_name": "",
+                        "attention_score": "",
+                        "status": "error",
+                        "error_message": "No valid DICOM/PNG files found"
+                    })
+                csv_files.append(csv_path)
+                summary_results.append({
+                    "subfolder_name": subfolder_name,
+                    "status": "error",
+                    "error_message": "No valid DICOM/PNG files found",
+                    "csv_file": csv_filename
+                })
+                continue
+            
+            # Tạo thư mục kết quả cho subfolder này
+            subfolder_result_dir = os.path.join(batch_result_dir, subfolder_name)
+            os.makedirs(subfolder_result_dir, exist_ok=True)
+            
+            # Thực hiện dự đoán
+            try:
+                pred_dict, _, attention_info = predict(
+                    subfolder_path,
+                    subfolder_result_dir,
+                    model
+                )
+                
+                # Lấy điểm số tổng thể (Sybil trả về scores là list)
+                prediction_scores = pred_dict.get("predictions", [])
+                overall_score = None
+                if prediction_scores and len(prediction_scores) > 0:
+                    # Sybil có thể trả về nhiều scores, lấy score đầu tiên
+                    if isinstance(prediction_scores[0], (list, tuple)):
+                        overall_score = prediction_scores[0][0] if len(prediction_scores[0]) > 0 else None
+                    else:
+                        overall_score = prediction_scores[0]
+                
+                # Tạo CSV cho subfolder này với thông tin từng ảnh
+                csv_filename = f"{subfolder_name}_results.csv"
+                csv_path = os.path.join(batch_result_dir, csv_filename)
+                
+                with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
+                    fieldnames = [
+                        "file_name",
+                        "attention_score",
+                        "overall_score",
+                        "subfolder_name",
+                        "subfolder_path"
+                    ]
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    writer.writeheader()
+                    
+                    # Ghi thông tin từng ảnh
+                    attention_scores = attention_info.get("attention_scores", []) if attention_info else []
+                    if attention_scores:
+                        for img_info in attention_scores:
+                            writer.writerow({
+                                "file_name": img_info.get("file_name_pred", ""),
+                                "attention_score": img_info.get("attention_score", 0),
+                                "overall_score": overall_score,
+                                "subfolder_name": subfolder_name,
+                                "subfolder_path": subfolder_path
+                            })
+                    else:
+                        # Nếu không có attention scores, vẫn tạo CSV với thông tin tổng thể
+                        writer.writerow({
+                            "file_name": "N/A",
+                            "attention_score": "",
+                            "overall_score": overall_score,
+                            "subfolder_name": subfolder_name,
+                            "subfolder_path": subfolder_path
+                        })
+                
+                csv_files.append(csv_path)
+                summary_results.append({
+                    "subfolder_name": subfolder_name,
+                    "status": "success",
+                    "overall_score": overall_score,
+                    "total_images": attention_info.get("total_images", 0) if attention_info else 0,
+                    "returned_images": attention_info.get("returned_images", 0) if attention_info else 0,
+                    "csv_file": csv_filename
+                })
+                
+                print(f"Successfully processed subfolder: {subfolder_name}, score: {overall_score}, CSV created: {csv_filename}")
+                
+            except Exception as e:
+                error_msg = str(e)
+                print(f"Error processing subfolder {subfolder_name}: {error_msg}")
+                import traceback
+                traceback.print_exc()
+                
+                # Tạo CSV với thông báo lỗi
+                csv_filename = f"{subfolder_name}_results.csv"
+                csv_path = os.path.join(batch_result_dir, csv_filename)
+                with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
+                    writer = csv.DictWriter(
+                        csvfile,
+                        fieldnames=["file_name", "attention_score", "status", "error_message"]
+                    )
+                    writer.writeheader()
+                    writer.writerow({
+                        "file_name": "",
+                        "attention_score": "",
+                        "status": "error",
+                        "error_message": error_msg
+                    })
+                csv_files.append(csv_path)
+                summary_results.append({
+                    "subfolder_name": subfolder_name,
+                    "status": "error",
+                    "error_message": error_msg,
+                    "csv_file": csv_filename
+                })
+                
+        except Exception as e:
+            error_msg = str(e)
+            print(f"Unexpected error processing subfolder {subfolder_name}: {error_msg}")
+            import traceback
+            traceback.print_exc()
+            
+            # Tạo CSV với thông báo lỗi
+            csv_filename = f"{subfolder_name}_results.csv"
+            csv_path = os.path.join(batch_result_dir, csv_filename)
+            try:
+                with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
+                    writer = csv.DictWriter(
+                        csvfile,
+                        fieldnames=["file_name", "attention_score", "status", "error_message"]
+                    )
+                    writer.writeheader()
+                    writer.writerow({
+                        "file_name": "",
+                        "attention_score": "",
+                        "status": "error",
+                        "error_message": error_msg
+                    })
+                csv_files.append(csv_path)
+                summary_results.append({
+                    "subfolder_name": subfolder_name,
+                    "status": "error",
+                    "error_message": error_msg,
+                    "csv_file": csv_filename
+                })
+            except Exception as csv_error:
+                print(f"Error creating error CSV for {subfolder_name}: {csv_error}")
+    
+    # Tạo file ZIP chứa tất cả các CSV files
+    zip_filename = f"{batch_session_id}_results.zip"
+    zip_path = os.path.join(batch_result_dir, zip_filename)
+    
+    try:
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+            for csv_file in csv_files:
+                if os.path.exists(csv_file):
+                    arcname = os.path.basename(csv_file)
+                    zipf.write(csv_file, arcname)
+                    print(f"Added {arcname} to ZIP")
+        
+        # Tạo file summary CSV
+        summary_csv_filename = f"{batch_session_id}_summary.csv"
+        summary_csv_path = os.path.join(batch_result_dir, summary_csv_filename)
+        with open(summary_csv_path, "w", newline="", encoding="utf-8") as csvfile:
+            fieldnames = [
+                "subfolder_name",
+                "status",
+                "overall_score",
+                "total_images",
+                "returned_images",
+                "error_message",
+                "csv_file"
+            ]
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for result in summary_results:
+                writer.writerow(result)
+        
+        # Thêm summary CSV vào ZIP
+        with zipfile.ZipFile(zip_path, "a", zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(summary_csv_path, summary_csv_filename)
+        
+        print(f"ZIP file created: {zip_path}")
+        print(f"Total processed: {len(summary_results)}, Successful: {sum(1 for r in summary_results if r['status'] == 'success')}, Failed: {sum(1 for r in summary_results if r['status'] == 'error')}")
+        
+        # Trả về file ZIP
+        return send_file(zip_path, as_attachment=True, download_name=zip_filename)
+        
+    except Exception as e:
+        print(f"Error creating ZIP file: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"Failed to create ZIP file: {str(e)}"}), 500
