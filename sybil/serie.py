@@ -1,4 +1,5 @@
 import functools
+import logging
 from typing import List, Optional, NamedTuple, Literal
 from argparse import Namespace
 
@@ -25,6 +26,9 @@ class Label(NamedTuple):
     y_seq: np.ndarray
     y_mask: np.ndarray
     censor_time: int
+
+
+logger = logging.getLogger(__name__)
 
 
 class Serie:
@@ -189,18 +193,40 @@ class Serie:
         if file_type == "dicom":
             slice_positions = []
             processed_paths = []
+            fallback_counter = 0
             for path in paths:
                 dcm = pydicom.dcmread(path, stop_before_pixels=True)
                 processed_paths.append(path)
-                slice_positions.append(float(dcm.ImagePositionPatient[-1]))
+                position = getattr(dcm, "ImagePositionPatient", None)
+                if position is not None:
+                    slice_positions.append(float(position[-1]))
+                else:
+                    fallback = getattr(dcm, "SliceLocation", None)
+                    if fallback is None:
+                        fallback = getattr(dcm, "InstanceNumber", None)
+                    if fallback is not None:
+                        slice_positions.append(float(fallback))
+                    else:
+                        slice_positions.append(float(len(slice_positions)))
+                    fallback_counter += 1
+
+            if fallback_counter:
+                logger.warning(
+                    "Serie metadata missing ImagePositionPatient for %d/%d slices; "
+                    "used SliceLocation/InstanceNumber/index fallback.",
+                    fallback_counter,
+                    len(processed_paths),
+                )
 
             processed_paths, slice_positions = order_slices(
                 processed_paths, slice_positions
             )
 
-            thickness = float(dcm.SliceThickness)
-            pixel_spacing = list(map(float, dcm.PixelSpacing))
-            manufacturer = dcm.Manufacturer
+            reference_dcm = pydicom.dcmread(processed_paths[0], stop_before_pixels=True)
+            thickness = float(getattr(reference_dcm, "SliceThickness", 1.0))
+            pixel_spacing_raw = getattr(reference_dcm, "PixelSpacing", [1.0, 1.0])
+            pixel_spacing = list(map(float, pixel_spacing_raw))
+            manufacturer = getattr(reference_dcm, "Manufacturer", "")
             voxel_spacing = torch.tensor(pixel_spacing + [thickness, 1])
         elif file_type == "png":
             processed_paths = paths

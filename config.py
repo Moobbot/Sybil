@@ -8,7 +8,7 @@ IS_DEV = ENV == "develop"
 
 # Server Configuration
 HOST_CONNECT_DEFAULT = "0.0.0.0"
-PORT_CONNECT_DEFAULT = 5555
+PORT_CONNECT_DEFAULT = 5557
 HOST_CONNECT = os.getenv("HOST_CONNECT", HOST_CONNECT_DEFAULT)
 PORT_CONNECT = int(os.getenv("PORT_CONNECT", PORT_CONNECT_DEFAULT))
 
@@ -104,4 +104,28 @@ SECURITY_CONFIG = {
     "CORS_ORIGINS": ["*"] if IS_DEV else ["https://example.com"],
     "CORS_METHODS": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     "CORS_HEADERS": ["*"],
+}
+
+# API Metadata
+API_CONFIG = {
+    "TITLE": os.getenv("API_TITLE", "Sybil DICOM Diagnosis API"),
+    "DESCRIPTION": os.getenv(
+        "API_DESCRIPTION",
+        "Endpoints for Sybil-based lung cancer risk estimation workflows.",
+    ),
+    "VERSION": os.getenv("API_VERSION", "1.0.0"),
+    "CONTACT": {
+        "name": os.getenv("API_CONTACT_NAME", "Dicom Diagnosis"),
+        "url": os.getenv("API_CONTACT_URL", "https://example.com"),
+        "email": os.getenv("API_CONTACT_EMAIL", "support@example.com"),
+    },
+    "TOS": os.getenv(
+        "API_TERMS_URL", "https://example.com/terms"
+    ),
+}
+
+SWAGGER_UI_CONFIG = {
+    "SPEC_ENDPOINT": "/swagger.json",
+    "DOCS_ROUTE": "/docs/",
+    "JSON_EDITOR": False,
 }

@@ -5,10 +5,10 @@ import shutil
 import socket
 import time
 import zipfile
+from typing import Iterable, Tuple
 
 import numpy as np
 import pydicom
-from flask import jsonify
 from PIL import Image
 from werkzeug.utils import secure_filename
 
@@ -75,7 +75,22 @@ def dicom_to_png(dicom_file):
     return img_base64
 
 
-def save_uploaded_files(files, session_id, folder_save=FOLDERS["UPLOAD"]):
+def _write_file_like(source, destination):
+    """Persist both Flask FileStorage and FastAPI UploadFile objects to disk."""
+    if hasattr(source, "save"):
+        source.save(destination)
+        return
+
+    file_obj = getattr(source, "file", None) or source
+    file_obj.seek(0)
+    with open(destination, "wb") as target:
+        shutil.copyfileobj(file_obj, target)
+    file_obj.seek(0)
+
+
+def save_uploaded_files(
+    files: Iterable, session_id: str, folder_save: str = FOLDERS["UPLOAD"]
+) -> Tuple[list, str]:
     """Save uploaded files to the specified folder
 
     Args:
@@ -91,10 +106,13 @@ def save_uploaded_files(files, session_id, folder_save=FOLDERS["UPLOAD"]):
     os.makedirs(upload_path, exist_ok=True)
 
     for file in files:
-        if file and allowed_file(file.filename):
+        if not file or not getattr(file, "filename", None):
+            continue
+
+        if allowed_file(file.filename):
             filename = secure_filename(file.filename)
             file_path = os.path.join(upload_path, filename)
-            file.save(file_path)
+            _write_file_like(file, file_path)
             uploaded_files.append(filename)
 
     return uploaded_files, upload_path
@@ -132,7 +150,7 @@ def get_local_ip():
 def save_uploaded_zip(file, session_id, folder_save=FOLDERS["UPLOAD"]):
     """Lưu file ZIP tải lên"""
     zip_path = os.path.join(folder_save, f"{session_id}.zip")
-    file.save(zip_path)
+    _write_file_like(file, zip_path)
     return zip_path
 
 
@@ -145,9 +163,9 @@ def extract_zip_file(zip_path, session_id, folder_save=FOLDERS["UPLOAD"]):
     try:
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             zip_ref.extractall(unzip_path)
-    except zipfile.BadZipFile:
+    except zipfile.BadZipFile as exc:
         os.remove(zip_path)
-        return None, jsonify({"error": "Invalid ZIP file"}), 400
+        raise ValueError("Invalid ZIP file") from exc
 
     os.remove(zip_path)
 
@@ -158,7 +176,7 @@ def extract_zip_file(zip_path, session_id, folder_save=FOLDERS["UPLOAD"]):
     if len(subfolders) == 1:
         unzip_path = os.path.join(unzip_path, subfolders[0])
 
-    return unzip_path, None, None
+    return unzip_path
 
 
 def get_valid_files(unzip_path):

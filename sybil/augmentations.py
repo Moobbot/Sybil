@@ -198,7 +198,7 @@ class Normalize_Tensor_2d(Abstract_augmentation):
 
         if self.permute:
             img = img.permute(2, 0, 1)
-            input_dict["input"] = self.transform(img).permute(1, 2, 0)
+            input_dict["input"] = self.transform(img)
         else:
             input_dict["input"] = self.transform(img)
 
@@ -224,8 +224,18 @@ class Force_Num_Chan_Tensor_2d(Abstract_augmentation):
         num_dims = len(img.shape)
         if num_dims == 2:
             img = img.unsqueeze(0)
-        existing_chan = img.size()[0]
+        elif num_dims == 3 and img.size(0) not in (1, self.args.num_chan):
+            # Handle channel-last tensors by permuting to channel-first
+            if img.size(2) in (1, self.args.num_chan):
+                img = img.permute(2, 0, 1)
+            else:
+                raise ValueError(
+                    f"Unexpected image shape {tuple(img.size())} for channel normalization"
+                )
+        existing_chan = img.size(0)
         if not existing_chan == self.args.num_chan:
             input_dict["input"] = img.expand(self.args.num_chan, *img.size()[1:])
+        else:
+            input_dict["input"] = img
 
         return input_dict

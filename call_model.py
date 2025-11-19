@@ -6,8 +6,9 @@ import urllib
 import zipfile
 from typing import Dict, Literal
 
+import logging
+
 import pydicom
-from flask import logging
 
 from config import (
     CALIBRATOR_PATH,
