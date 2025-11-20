@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from sybil.serie import Serie
 from typing import Dict, List, Union
 import os
+import cv2
 
 def collate_attentions(attention_dict: Dict[str, np.ndarray], N: int, eps=1e-6) -> np.ndarray:
     a1 = attention_dict["image_attention_1"]
@@ -30,14 +31,20 @@ def collate_attentions(attention_dict: Dict[str, np.ndarray], N: int, eps=1e-6) 
     return attention_up
 
 def build_overlayed_images(images: List[np.ndarray], attention: np.ndarray, gain: int = 3):
+    target_size = (512, 512)
     overlayed_images = []
     N = len(images)
     for i in range(N):
-        overlayed = np.zeros((512, 512, 3))
-        overlayed[..., 2] = images[i]
-        overlayed[..., 1] = images[i]
+        # Resize image to target size if needed
+        img = images[i]
+        if img.shape[:2] != target_size:
+            img = cv2.resize(img, target_size, interpolation=cv2.INTER_LINEAR)
+        
+        overlayed = np.zeros((target_size[0], target_size[1], 3))
+        overlayed[..., 2] = img
+        overlayed[..., 1] = img
         overlayed[..., 0] = np.clip(
-            (attention[i, ...] * gain * 256) + images[i],
+            (attention[i, ...] * gain * 256) + img,
             a_min=0,
             a_max=255,
         )

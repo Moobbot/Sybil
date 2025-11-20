@@ -2,6 +2,7 @@ import logging
 import os
 from typing import Dict, List, Union
 
+import cv2
 import imageio
 import numpy as np
 import pydicom
@@ -73,27 +74,33 @@ def build_overlayed_images(
     Returns:
         List[np.ndarray]: List of overlayed images.
     """
+    target_size = viz_cfg["IMAGE_SIZE"]  # (512, 512)
     overlayed_images = []
     N = len(images)
     for i in range(N):
+        # Resize image to target size if needed
+        img = images[i]
+        if img.shape[:2] != target_size:
+            img = cv2.resize(img, target_size, interpolation=cv2.INTER_LINEAR)
+        
         if not save_original or np.any(attention[i] > viz_cfg["EPS"]):
             # Create overlay for all cases if save_original=False
             # or when there is significant attention if save_original=True
-            overlayed = np.zeros((512, 512, 3))
-            overlayed[..., 2] = images[i]
-            overlayed[..., 1] = images[i]
+            overlayed = np.zeros((target_size[0], target_size[1], 3))
+            overlayed[..., 2] = img
+            overlayed[..., 1] = img
             overlayed[..., 0] = np.clip(
-                (attention[i, ...] * gain * 256) + images[i],
+                (attention[i, ...] * gain * 256) + img,
                 a_min=0,
                 a_max=255,
             )
             overlayed_images.append(np.uint8(overlayed))
         else:
             # Only save original image when save_original=True and no significant attention
-            original = np.zeros((512, 512, 3))
-            original[..., 0] = images[i]
-            original[..., 1] = images[i]
-            original[..., 2] = images[i]
+            original = np.zeros((target_size[0], target_size[1], 3))
+            original[..., 0] = img
+            original[..., 1] = img
+            original[..., 2] = img
             overlayed_images.append(np.uint8(original))
 
     return overlayed_images
