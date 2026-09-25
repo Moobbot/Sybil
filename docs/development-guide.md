@@ -16,7 +16,6 @@ Sybil/
 ├── custom/               # Custom implementations
 ├── docs/                 # Documentation
 ├── files/                # Data files
-├── old_code_sybil/       # Legacy code
 ├── results/              # Prediction results
 ├── scripts/              # Utility scripts
 ├── sybil/                # Core model implementation

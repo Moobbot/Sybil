@@ -30,7 +30,7 @@ def _build_model_info():
     """P4c: identify EXACTLY the weights + inference code that were loaded (see model_info.py).
 
     The code digest roots are an EXPLICIT list — not all of /app (which holds the
-    uploads/ and results/ volumes and old_code_sybil/).
+    uploads/ and results/ volumes).
     """
     base = os.path.dirname(os.path.abspath(__file__))
     src = source_digest([os.path.join(base, p) for p in ("sybil", "call_model.py", "utils.py", "config.py")])
