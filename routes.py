@@ -7,6 +7,7 @@ from flask import Blueprint, jsonify, request, send_file, send_from_directory
 from call_model import LOAD_INFO, load_model
 from call_model import predict as _predict_unserialized
 from inference_gate import serialized, start_watchdog, status as inference_status
+from input_series import CaseInputError
 from model_info import build_info, source_digest
 from config import FOLDERS, IS_DEV
 from utils import (
@@ -33,7 +34,7 @@ def _build_model_info():
     uploads/ and results/ volumes).
     """
     base = os.path.dirname(os.path.abspath(__file__))
-    src = source_digest([os.path.join(base, p) for p in ("sybil", "call_model.py", "utils.py", "config.py")])
+    src = source_digest([os.path.join(base, p) for p in ("sybil", "call_model.py", "utils.py", "config.py", "input_series.py")])
     code = f"src.{src[:8]}" if src else "src.unknown"
     flags = ["fallback"] if LOAD_INFO["fallback"] else []
     device = str(getattr(model, "device", "")) or None
@@ -51,6 +52,13 @@ print(f"[model_info] {MODEL_INFO['version']}")
 # /api_predict, /api_predict_file, /api_predict_zip go through here.
 predict = serialized(_predict_unserialized)
 start_watchdog()
+
+
+@bp.errorhandler(CaseInputError)
+def _case_input_error(e):
+    # P5f: a case that is not one readable CT series is the uploader's to fix: 400 + the
+    # reason, instead of an HTML 500 page the backend would show as the error text.
+    return jsonify({"error": str(e)}), 400
 
 
 @bp.route("/health", methods=["GET"])

@@ -19,6 +19,7 @@ from config import (
     MODEL_PATHS,
 )
 from config import VISUALIZATION_CONFIG as cfg
+from input_series import detect_file_type, list_input_files
 from sybil.datasets import utils as utils_datasets
 from sybil.model import Sybil
 from sybil.serie import Serie
@@ -104,18 +105,9 @@ def get_input_files(image_dir):
         image_dir (str): Directory containing input files
 
     Returns:
-        list: List of full paths to input files
+        list: Full paths of the input files, in name order (P5f: not os.listdir order)
     """
-    input_files = [
-        os.path.join(image_dir, x)
-        for x in os.listdir(image_dir)
-        if os.path.isfile(os.path.join(image_dir, x))
-    ]
-
-    if not input_files:
-        raise ValueError("⚠️ No valid files found in the directory.")
-
-    return input_files
+    return list_input_files(image_dir)
 
 
 def determine_file_type(input_files, image_dir):
@@ -123,46 +115,18 @@ def determine_file_type(input_files, image_dir):
 
     Args:
         input_files (list): List of input file paths
-        image_dir (str): Input directory path
+        image_dir (str): Input directory path (unused, kept for callers)
 
     Returns:
         tuple: (file_type, voxel_spacing)
+
+    Raises:
+        CaseInputError: the folder mixes file types. (P5f: this used to pick one of the
+        types by hash order, so the same case succeeded or failed depending on the process.)
     """
-    voxel_spacing = None
-    file_type = "auto"
-
-    if file_type == "auto":
-        extensions = {os.path.splitext(x)[1] for x in input_files}
-        if not extensions:
-            raise ValueError("⚠️ No files with valid extensions found.")
-        extension = extensions.pop()
-        if len(extensions) > 1:
-            raise ValueError(
-                f"⚠️ Multiple file types found in {image_dir}: {','.join(extensions)}"
-            )
-
-        file_type = "dicom" if extension.lower() not in {".png"} else "png"
-        if file_type == "png":
-            voxel_spacing = utils_datasets.VOXEL_SPACING
-
+    file_type = detect_file_type(input_files)
+    voxel_spacing = utils_datasets.VOXEL_SPACING if file_type == "png" else None
     return file_type, voxel_spacing
-
-
-def get_patient_name(file_name):
-    """Extract patient name and number from filename.
-
-    Args:
-        file_name (str): Input filename
-
-    Returns:
-        tuple: (base_name, number)
-    """
-    base_name = os.path.splitext(os.path.basename(file_name))[0]
-    parts = base_name.split("_")
-    if parts and parts[-1].isdigit():
-        return "_".join(parts[:-1]), parts[-1]
-    else:
-        return base_name, ""
 
 
 def process_attention_scores(
@@ -345,7 +309,8 @@ def predict(
         with open(attention_path, "wb") as f:
             pickle.dump(prediction, f)
 
-        attention_info = process_attention_scores(prediction, serie, input_files)
+        # P5f: names follow the slice order the model used (serie order), not the listing.
+        attention_info = process_attention_scores(prediction, serie, list(serie._meta.paths))
 
         # Save rankings
         ranking_path = os.path.join(output_dir, "image_ranking.json")
@@ -359,7 +324,7 @@ def predict(
             attentions=prediction.attentions,
             save_directory=output_dir,
             dicom_metadata_list=dicom_metadata_list,
-            input_files=input_files,
+            input_files=list(serie._meta.paths),
             save_as_dicom=MODEL_CONFIG["SAVE_AS_DICOM_DEFAULT"],
             save_original=MODEL_CONFIG["SAVE_ORIGINAL_DEFAULT"],
         )

@@ -7,7 +7,8 @@ import numpy as np
 import pydicom
 import torchio as tio
 
-from sybil.datasets.utils import order_slices, VOXEL_SPACING
+from sybil.datasets.utils import VOXEL_SPACING
+from input_series import order_dicom_slices, series_count, slice_key
 from sybil.utils.loading import get_sample_loader
 
 
@@ -187,17 +188,24 @@ class Serie:
             slice_positions: list of indices for dicoms along z-axis
         """
         if file_type == "dicom":
-            slice_positions = []
-            processed_paths = []
+            # P5f: a total order (z, InstanceNumber, series, file name) instead of an unstable
+            # argsort on z alone — slices at the same z were ordered arbitrarily, which can
+            # change the prediction.
+            headers = {}
+            keys = []
             for path in paths:
                 dcm = pydicom.dcmread(path, stop_before_pixels=True)
-                processed_paths.append(path)
-                slice_positions.append(float(dcm.ImagePositionPatient[-1]))
+                headers[path] = dcm
+                keys.append(slice_key(path, dcm))
+            ordered = order_dicom_slices(keys)
+            if series_count(keys) > 1:
+                # Scored together, as before; logged so the case can be recognised.
+                print(f"[input] {series_count(keys)} DICOM series in one case: all slices are used together")
+            processed_paths = [k.path for k in ordered]
+            slice_positions = [k.z for k in ordered]
 
-            processed_paths, slice_positions = order_slices(
-                processed_paths, slice_positions
-            )
-
+            # Series-level values from the first slice (was: whichever file was read last).
+            dcm = headers[processed_paths[0]]
             thickness = float(dcm.SliceThickness)
             pixel_spacing = list(map(float, dcm.PixelSpacing))
             manufacturer = dcm.Manufacturer

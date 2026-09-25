@@ -2,6 +2,7 @@
 
 Inside the container:  cd /app && python tests/test_download_checkpoints.py
 """
+import contextlib
 import os
 import sys
 import tempfile
@@ -15,8 +16,13 @@ except ImportError:
     pass
 
 
+@contextlib.contextmanager
 def _setup(tmp):
+    """Point call_model at a temporary checkpoint folder and a fake download — and put
+    everything back afterwards, so tests running later in the same session (the known-answer
+    test) see the real checkpoints."""
     import call_model as cm
+    saved = (cm.FOLDERS["CHECKPOINT"], list(cm.MODEL_PATHS), cm.urllib.request.urlretrieve)
     ckpt = os.path.join(tmp, "ckpt")
     os.makedirs(ckpt)
     names = ["a.ckpt", "b.ckpt", "cal.json"]
@@ -24,23 +30,24 @@ def _setup(tmp):
     with zipfile.ZipFile(src_zip, "w") as z:
         for n in names:
             z.writestr(n, n * 1000)
-    cm.FOLDERS["CHECKPOINT"] = ckpt
-    cm.MODEL_PATHS[:] = [os.path.join(ckpt, n) for n in names[:2]]
-    cm.urllib.request.urlretrieve = lambda url, dst: __import__("shutil").copy(src_zip, dst)
-    return cm, ckpt, names
+    try:
+        cm.FOLDERS["CHECKPOINT"] = ckpt
+        cm.MODEL_PATHS[:] = [os.path.join(ckpt, n) for n in names[:2]]
+        cm.urllib.request.urlretrieve = lambda url, dst: __import__("shutil").copy(src_zip, dst)
+        yield cm, ckpt, names
+    finally:
+        cm.FOLDERS["CHECKPOINT"], cm.MODEL_PATHS[:], cm.urllib.request.urlretrieve = saved
 
 
 def test_successful_download_puts_files_in_place_and_leaves_no_temp_dir():
-    with tempfile.TemporaryDirectory() as tmp:
-        cm, ckpt, names = _setup(tmp)
+    with tempfile.TemporaryDirectory() as tmp, _setup(tmp) as (cm, ckpt, names):
         cm.download_checkpoints()
         assert sorted(os.listdir(ckpt)) == sorted(names)
         assert open(os.path.join(ckpt, "a.ckpt")).read() == "a.ckpt" * 1000
 
 
 def test_interrupted_extraction_leaves_no_truncated_file():
-    with tempfile.TemporaryDirectory() as tmp:
-        cm, ckpt, _ = _setup(tmp)
+    with tempfile.TemporaryDirectory() as tmp, _setup(tmp) as (cm, ckpt, _):
         real = zipfile.ZipFile.extractall
 
         def boom(self, path=None, *a, **k):
