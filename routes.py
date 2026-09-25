@@ -4,7 +4,9 @@ import uuid
 
 from flask import Blueprint, jsonify, request, send_file, send_from_directory
 
-from call_model import load_model, predict
+from call_model import load_model
+from call_model import predict as _predict_unserialized
+from inference_gate import serialized, status as inference_status
 from config import FOLDERS, IS_DEV
 from utils import (
     cleanup_old_results,
@@ -21,6 +23,16 @@ from utils import (
 bp = Blueprint("routes", __name__)
 
 model = load_model()
+
+# Moi lan suy luan chay noi tiep (xem inference_gate.py). Ca 3 route
+# /api_predict, /api_predict_file, /api_predict_zip deu goi qua day.
+predict = serialized(_predict_unserialized)
+
+
+@bp.route("/health", methods=["GET"])
+def health():
+    """Song hay chet, ranh hay ban. Khong cho khoa suy luan."""
+    return jsonify({"status": "ok", "model_loaded": model is not None, **inference_status()})
 
 
 @bp.route("/api_predict", methods=["POST"])

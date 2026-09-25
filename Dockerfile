@@ -22,9 +22,11 @@ RUN python setup.py
 COPY . .
 
 # Set environment variables
+# config.py doc PYTHON_ENV, KHONG doc ENV. Truoc day dat ENV=prod (sai ten) nen
+# IS_DEV=True -> debug + reloader -> model nap 2 lan (P0 do: 2 tien trinh, RAM dinh 6.5 GiB).
 ENV HOST_CONNECT=0.0.0.0 \
     PORT=5555 \
-    ENV=prod \
+    PYTHON_ENV=prod \
     DEVICE=cuda
 
 EXPOSE 5555
