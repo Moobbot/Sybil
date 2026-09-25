@@ -41,14 +41,14 @@ def cleanup_old_results(folders, expiry_time=FILE_RETENTION):
 
 
 def dicom_to_png(dicom_file):
-    """Chuyển đổi file DICOM thành ảnh PNG và trả về ảnh dạng base64"""
+    """Convert a DICOM file to a PNG image and return the image as base64"""
     dicom_data = pydicom.dcmread(dicom_file)
 
-    # Kiểm tra loại ảnh
+    # Check the image type
     photometric_interpretation = dicom_data.PhotometricInterpretation
     pixel_array = dicom_data.pixel_array.astype(np.float32)
 
-    # Chuẩn hóa giá trị pixel về khoảng 0-255
+    # Normalise pixel values to the 0-255 range
     pixel_array = (
         (pixel_array - np.min(pixel_array))
         / (np.max(pixel_array) - np.min(pixel_array))
@@ -56,20 +56,20 @@ def dicom_to_png(dicom_file):
     )
     pixel_array = pixel_array.astype(np.uint8)
 
-    # Xử lý ảnh màu
+    # Handle colour images
     if photometric_interpretation == "RGB":
         image = Image.fromarray(pixel_array)
     elif photometric_interpretation == "YBR_FULL":
         image = Image.fromarray(pixel_array, mode="YCbCr").convert("RGB")
     else:
-        image = Image.fromarray(pixel_array, mode="L")  # Ảnh grayscale
+        image = Image.fromarray(pixel_array, mode="L")  # Grayscale image
 
-    # Lưu ảnh vào bộ nhớ dưới dạng PNG
+    # Save the image to memory as PNG
     img_io = io.BytesIO()
     image.save(img_io, format="PNG")
     img_io.seek(0)
 
-    # Mã hóa ảnh PNG thành base64
+    # Encode the PNG image as base64
     img_base64 = base64.b64encode(img_io.getvalue()).decode("utf-8")
 
     return img_base64
@@ -101,12 +101,12 @@ def save_uploaded_files(files, session_id, folder_save=FOLDERS["UPLOAD"]):
 
 
 def get_file_path(session_id, filename):
-    """Trả về đường dẫn đầy đủ của file trong thư mục kết quả."""
+    """Return the full path of a file in the results folder."""
     return os.path.join(FOLDERS["RESULTS"], session_id, "serie_0", filename)
 
 
 def get_overlay_files(output_dir, session_id):
-    """Lấy danh sách ảnh overlay trong thư mục session."""
+    """List the overlay images in the session folder."""
     if not os.path.exists(output_dir) or not os.listdir(output_dir):
         print(f"⚠️ No overlay images found for session {session_id}")
         return []
@@ -130,14 +130,14 @@ def get_local_ip():
 
 
 def save_uploaded_zip(file, session_id, folder_save=FOLDERS["UPLOAD"]):
-    """Lưu file ZIP tải lên"""
+    """Save the uploaded ZIP file"""
     zip_path = os.path.join(folder_save, f"{session_id}.zip")
     file.save(zip_path)
     return zip_path
 
 
 def extract_zip_file(zip_path, session_id, folder_save=FOLDERS["UPLOAD"]):
-    """Giải nén ZIP, kiểm tra thư mục con"""
+    """Extract the ZIP and check for a sub-folder"""
     unzip_path = os.path.join(folder_save, session_id)
     os.makedirs(unzip_path, exist_ok=True)
     print("unzip_path:", unzip_path)
@@ -151,7 +151,7 @@ def extract_zip_file(zip_path, session_id, folder_save=FOLDERS["UPLOAD"]):
 
     os.remove(zip_path)
 
-    # Nếu ZIP chỉ có 1 thư mục con, cập nhật lại đường dẫn
+    # If the ZIP holds a single sub-folder, update the path
     subfolders = [
         f for f in os.listdir(unzip_path) if os.path.isdir(os.path.join(unzip_path, f))
     ]
@@ -162,7 +162,7 @@ def extract_zip_file(zip_path, session_id, folder_save=FOLDERS["UPLOAD"]):
 
 
 def get_valid_files(unzip_path):
-    """Lấy danh sách file hợp lệ (DICOM/PNG)"""
+    """List the valid files (DICOM/PNG)"""
     valid_files = []
     for root, _, files in os.walk(unzip_path):
         for filename in files:
@@ -172,7 +172,7 @@ def get_valid_files(unzip_path):
 
 
 def create_zip_result(output_dir, session_id, folder_save=FOLDERS["RESULTS"]):
-    """Nén ảnh dự đoán thành file ZIP"""
+    """Compress the prediction images into a ZIP file"""
     result_zip_path = os.path.join(folder_save, f"{session_id}.zip")
     if ENV == "develop":
         print(f"Creating zip file from {output_dir} to {result_zip_path}")

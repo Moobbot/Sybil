@@ -1,16 +1,18 @@
-"""Chạy suy luận MỘT ca một lúc; ca đến sau chờ tới lượt.
+"""Run inference for ONE case at a time; later cases wait their turn.
 
-Dev server Flask chạy đa luồng: hai request cùng lúc là hai lần suy luận song
-song, RAM đỉnh nhân đôi và máy bị OOM ("tràn máy"). Khoá này buộc các lần suy
-luận chạy lần lượt. Request đến sau không bị từ chối, chỉ chờ.
+The web server handles requests on several threads (Flask's dev server, FastAPI's
+threadpool): two simultaneous requests are two parallel inferences, peak RAM
+doubles and the machine runs out of memory (OOM). This lock forces inferences to
+run one after another. Later requests are not rejected, they only wait.
 
-`status()` báo trạng thái cho /health mà không phải chờ khoá, nên /health vẫn
-trả lời ngay cả khi đang có ca chạy.
+`status()` reports the state to /health without waiting for the lock, so /health
+still answers while a case is running.
 
-Watchdog: nếu một ca chạy quá INFERENCE_MAX_SECONDS thì coi là TREO (CUDA hang,
-I/O đứng...). Khi đó khoá bị giữ mãi và mọi ca sau xếp hàng vô ích. /health báo
-`stuck`, và process tự thoát để `restart: unless-stopped` trong compose đưa
-service dậy lại — Docker KHÔNG tự khởi động lại container chỉ vì "unhealthy".
+Watchdog: if a case runs longer than INFERENCE_MAX_SECONDS it is considered HUNG
+(CUDA hang, stalled I/O...). The lock would then be held forever and every later
+case would queue for nothing. /health reports `stuck`, and the process exits so
+that `restart: unless-stopped` in compose brings the service back up — Docker does
+NOT restart a container just because it is "unhealthy".
 """
 
 import functools
@@ -19,8 +21,8 @@ import sys
 import threading
 import time
 
-# Ca hợp lệ dài nhất đo được: CVD trên CPU 748 s (P0). 30 phút là rộng rãi.
-# Default có lý giải; chỉnh bằng biến môi trường nếu phần cứng khác.
+# Longest valid case measured: CVD on CPU, 748 s (P0). 30 minutes is generous.
+# A reasoned default; override it with the environment variable on different hardware.
 INFERENCE_MAX_SECONDS = int(os.getenv("INFERENCE_MAX_SECONDS", "1800"))
 
 _run_lock = threading.Lock()
@@ -29,7 +31,7 @@ _info = {"busy": False, "started_at": None, "waiting": 0}
 
 
 def serialized(fn):
-    """Bọc một hàm suy luận để các lần gọi chạy nối tiếp nhau."""
+    """Wrap an inference function so that its calls run one after another."""
 
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
@@ -52,7 +54,7 @@ def serialized(fn):
 
 
 def status():
-    """Trạng thái hiện tại; không chờ khoá suy luận."""
+    """Current state; does not wait for the inference lock."""
     with _info_lock:
         started = _info["started_at"]
         running = round(time.time() - started, 1) if started else 0
@@ -70,8 +72,8 @@ def _watchdog(check_every=30):
         st = status()
         if st["stuck"]:
             print(
-                f"[watchdog] suy luan chay {st['running_seconds']}s > "
-                f"{INFERENCE_MAX_SECONDS}s — coi la TREO, thoat de Docker khoi dong lai",
+                f"[watchdog] inference has run {st['running_seconds']}s > "
+                f"{INFERENCE_MAX_SECONDS}s — considered HUNG, exiting so Docker restarts the service",
                 file=sys.stderr,
                 flush=True,
             )
@@ -79,5 +81,5 @@ def _watchdog(check_every=30):
 
 
 def start_watchdog():
-    """Gọi MỘT lần khi service khởi động."""
+    """Call ONCE when the service starts."""
     threading.Thread(target=_watchdog, name="inference-watchdog", daemon=True).start()

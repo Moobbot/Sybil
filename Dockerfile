@@ -22,8 +22,8 @@ RUN python setup.py
 COPY . .
 
 # Set environment variables
-# config.py doc PYTHON_ENV, KHONG doc ENV. Truoc day dat ENV=prod (sai ten) nen
-# IS_DEV=True -> debug + reloader -> model nap 2 lan (P0 do: 2 tien trinh, RAM dinh 6.5 GiB).
+# config.py reads PYTHON_ENV, NOT ENV. This used to set ENV=prod (wrong name), so
+# IS_DEV=True -> debug + reloader -> the model loaded twice (measured in P0: 2 processes, 6.5 GiB peak RAM).
 ENV HOST_CONNECT=0.0.0.0 \
     PORT=5555 \
     PYTHON_ENV=prod \

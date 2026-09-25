@@ -2,10 +2,10 @@
 VISUALIZATION_CONFIG = {
     # General constants
     "EPS": 1e-6,  # Epsilon value for numerical stability
-    "DEFAULT_GAIN": 3,  # Hệ số khuếch đại mặc định cho attention map
-    "DEFAULT_ATTENTION_THRESHOLD": 1e-6,  # Ngưỡng attention mặc định
-    "IMAGE_SIZE": (512, 512),  # Kích thước ảnh chuẩn
-    # Cấu hình DICOM
+    "DEFAULT_GAIN": 3,  # Default gain for the attention map
+    "DEFAULT_ATTENTION_THRESHOLD": 1e-6,  # Default attention threshold
+    "IMAGE_SIZE": (512, 512),  # Standard image size
+    # DICOM configuration
     "DICOM": {
         "BITS_ALLOCATED": 8,
         "BITS_STORED": 8,
@@ -17,7 +17,7 @@ VISUALIZATION_CONFIG = {
         "RESCALE_INTERCEPT": 0,
         "RESCALE_SLOPE": 1,
         "VOI_LUT_FUNCTION": "LINEAR",
-        # Các thuộc tính DICOM cần sao chép
+        # DICOM attributes to copy
         "ATTRIBUTES_TO_COPY": [
             "PixelSpacing",
             "SliceLocation",
@@ -26,13 +26,13 @@ VISUALIZATION_CONFIG = {
             "InstanceNumber",
         ],
     },
-    # Cấu hình tên file
+    # File naming configuration
     "FILE_NAMING": {
         "PREDICTION_PREFIX": "pred_",
         "ORIGINAL_SUFFIX": "", #_original
         "DEFAULT_PATIENT": "Unknown_Patient",
     },
-    # Cấu hình logging
+    # Logging configuration
     "LOGGING": {
         "SAVE_ORIGINAL_MESSAGE": "Saving original image for slice {} (no significant attention)",
         "MISSING_METADATA_WARNING": "No corresponding DICOM metadata found",

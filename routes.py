@@ -27,10 +27,10 @@ model = load_model()
 
 
 def _build_model_info():
-    """P4c: dinh danh DUNG bo trong so + ma suy luan da nap (xem model_info.py).
+    """P4c: identify EXACTLY the weights + inference code that were loaded (see model_info.py).
 
-    Goc digest ma la danh sach TUONG MINH — khong lay ca /app (co volume
-    uploads/, results/ va old_code_sybil/).
+    The code digest roots are an EXPLICIT list — not all of /app (which holds the
+    uploads/ and results/ volumes and old_code_sybil/).
     """
     base = os.path.dirname(os.path.abspath(__file__))
     src = source_digest([os.path.join(base, p) for p in ("sybil", "call_model.py", "utils.py", "config.py")])
@@ -42,23 +42,23 @@ def _build_model_info():
 
 try:
     MODEL_INFO = _build_model_info()
-except Exception as e:  # dinh danh loi KHONG duoc chan service khoi dong
-    print(f"[model_info] khong dung duoc dinh danh phien ban: {e}")
+except Exception as e:  # a failing identity must NOT stop the service from starting
+    print(f"[model_info] could not build the version identity: {e}")
     MODEL_INFO = {"model": "sybil", "loaded": model is not None, "version": None}
 print(f"[model_info] {MODEL_INFO['version']}")
 
-# Moi lan suy luan chay noi tiep (xem inference_gate.py). Ca 3 route
-# /api_predict, /api_predict_file, /api_predict_zip deu goi qua day.
+# Every inference runs one after another (see inference_gate.py). All 3 routes
+# /api_predict, /api_predict_file, /api_predict_zip go through here.
 predict = serialized(_predict_unserialized)
 start_watchdog()
 
 
 @bp.route("/health", methods=["GET"])
 def health():
-    """Song hay chet, ranh hay ban. Khong cho khoa suy luan.
+    """Alive or dead, idle or busy. Does not wait for the inference lock.
 
-    503 khi model chua nap hoac ca dang chay bi TREO — "co tra loi HTTP" khong
-    co nghia la dung duoc.
+    503 when the model is not loaded or the running case is HUNG — "answers HTTP"
+    does not mean usable.
     """
     st = inference_status()
     loaded = model is not None
@@ -69,7 +69,7 @@ def health():
 
 @bp.route("/info", methods=["GET"])
 def info():
-    """P4c: phien ban mo hinh dang chay. Chi ten file trong so (khong duong dan)."""
+    """P4c: the running model version. Weight file names only (no paths)."""
     if model is None:
         return jsonify({"model": "sybil", "loaded": False, "version": None}), 503
     return jsonify(MODEL_INFO)
@@ -112,7 +112,7 @@ def api_predict():
         "predictions": pred_dict["predictions"],
         "attention_info": attention_info,
         "message": "Prediction successful.",
-        # P4c: phien ban mo hinh da sinh ra DUNG ket qua nay.
+        # P4c: the model version that produced THIS result.
         "model_version": MODEL_INFO["version"],
     }
     if IS_DEV:
@@ -182,7 +182,7 @@ def api_predict_file():
             f"{base_url}/download_gif/{session_id}" if overlay_files else None
         ),
         "message": "Prediction successful.",
-        # P4c: phien ban mo hinh da sinh ra DUNG ket qua nay.
+        # P4c: the model version that produced THIS result.
         "model_version": MODEL_INFO["version"],
     }
 
@@ -281,7 +281,7 @@ def api_predict_zip():
         "overlay_images": zip_download_link,
         "attention_info": attention_info,
         "message": "Prediction successful.",
-        # P4c: phien ban mo hinh da sinh ra DUNG ket qua nay.
+        # P4c: the model version that produced THIS result.
         "model_version": MODEL_INFO["version"],
     }
     if IS_DEV:

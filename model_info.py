@@ -1,17 +1,18 @@
-"""Dinh danh phien ban mo hinh (P4c) — file DUNG CHUNG, giong het o Sybil va
-CVD-Risk-Estimator (nhu inference_gate.py).
+"""Model version identity (P4c) — a SHARED file, identical in Sybil and
+CVD-Risk-Estimator (like inference_gate.py).
 
-Muc dich: moi ket qua chan doan phai biet DUNG bo trong so + ma suy luan nao da
-sinh ra no. Dinh danh tinh tu NOI DUNG file da nap, khong tu ten/cau hinh, vi
-ca hai service deu co duong doi mo hinh tham lang (Sybil: nhanh except khi nap
-checkpoint; CVD: detector tim nap hong thi roi ve cach "simple").
+Purpose: every diagnosis result must know EXACTLY which weights + inference code
+produced it. The identity is computed from the CONTENT of the loaded files, not from
+names/configuration, because both services can silently switch model paths (Sybil:
+the except branch when loading checkpoints; CVD: when the heart detector fails to
+load it falls back to the "simple" method).
 
-    <key>@<code>+w.<digest12>[+<co>...]
-    vd: sybil@src.1a2b3c4d+w.3f9a1c2b7d10
-        cvd@iter700.src.5e6f7a8b+w.8be0c41a92f3
-        cvd@iter700.src.5e6f7a8b+w.8be0c41a92f3+det.simple   (co THEO TUNG CA, do routes.py noi vao)
+    <key>@<code>+w.<digest12>[+<flag>...]
+    e.g. sybil@src.1a2b3c4d+w.3f9a1c2b7d10
+         cvd@iter700.src.5e6f7a8b+w.8be0c41a92f3
+         cvd@iter700.src.5e6f7a8b+w.8be0c41a92f3+det.simple   (PER-CASE flag, appended by routes.py)
 
-Khong doc duoc file => "w.unknown" — khong bao gio bia.
+A file that cannot be read => "w.unknown" — never made up.
 """
 import hashlib
 import os
@@ -31,10 +32,10 @@ def file_sha256(path: str) -> str:
 
 
 def weights_digest(paths: Iterable[str]) -> Optional[str]:
-    """sha256 cua danh sach (ten file, sha256 noi dung) DA SAP XEP.
+    """sha256 of the SORTED list of (file name, content sha256).
 
-    Ten file tinh vao vi no mang y nghia (vd iter 700 vs 800). Thieu file nao
-    hoac danh sach rong => None (khong biet thi noi khong biet).
+    The file name is included because it carries meaning (e.g. iter 700 vs 800).
+    Any missing file or an empty list => None (if we do not know, we say so).
     """
     paths = list(paths)
     if not paths:
@@ -50,8 +51,8 @@ def weights_digest(paths: Iterable[str]) -> Optional[str]:
 
 
 def describe_weights(paths: Iterable[str]) -> List[dict]:
-    """Chi tra TEN file (khong duong dan tuyet doi). Ten trong so la hash/iter,
-    khong chua PHI."""
+    """Return file NAMES only (no absolute paths). Weight file names are hashes/iterations
+    and contain no PHI."""
     out = []
     for p in sorted(paths, key=os.path.basename):
         try:
@@ -62,8 +63,8 @@ def describe_weights(paths: Iterable[str]) -> List[dict]:
 
 
 def source_digest(roots: Iterable[str]) -> Optional[str]:
-    """sha256 cua MA SUY LUAN (.py) — bat duoc thay doi tien xu ly ma khong doi
-    trong so. `roots` gom thu muc (duyet de quy) va/hoac file le."""
+    """sha256 of the INFERENCE CODE (.py) — catches preprocessing changes that leave
+    the weights unchanged. `roots` holds directories (walked recursively) and/or single files."""
     files = []
     for root in roots:
         if os.path.isfile(root):
@@ -83,8 +84,8 @@ def source_digest(roots: Iterable[str]) -> Optional[str]:
         for f in sorted(files, key=lambda p: os.path.relpath(os.path.abspath(p), base)):
             rel = os.path.relpath(os.path.abspath(f), base).replace(os.sep, "/")
             with open(f, "rb") as fh:
-                # Chuan hoa CRLF -> LF: cung ma nguon build tren Windows (autocrlf)
-                # va Linux phai ra CUNG dinh danh, khong bao "doi ma" gia.
+                # Normalise CRLF -> LF: the same source built on Windows (autocrlf)
+                # and on Linux must give the SAME identity, not a false "code changed".
                 content = fh.read().replace(b"\r\n", b"\n")
             h.update(rel.encode() + b"\0" + hashlib.sha256(content).hexdigest().encode() + b"\n")
     except OSError:
@@ -105,8 +106,8 @@ def build_info(
     device: Optional[str],
     fallback: bool = False,
 ) -> dict:
-    """Noi dung tra ve o GET /info. Tinh MOT lan luc nap model; moi file chi
-    hash MOT lan (describe_weights), digest tinh lai tu ket qua do."""
+    """Body returned by GET /info. Computed ONCE when the model loads; each file is
+    hashed ONCE (describe_weights) and the digest is derived from that result."""
     weights = describe_weights(weight_paths)
     digest = None
     if weights and all(w["sha256"] for w in weights):

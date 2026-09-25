@@ -1,6 +1,6 @@
-"""P4c — tai checkpoint an toan khi bi ngat (can torch/sybil: chay trong image Sybil).
+"""P4c — checkpoint download is safe when interrupted (needs torch/sybil: run inside the Sybil image).
 
-Trong container:  cd /app && python tests/test_download_checkpoints.py
+Inside the container:  cd /app && python tests/test_download_checkpoints.py
 """
 import os
 import sys
@@ -30,7 +30,7 @@ def _setup(tmp):
     return cm, ckpt, names
 
 
-def test_tai_thanh_cong_file_nam_dung_cho_khong_con_thu_muc_tam():
+def test_successful_download_puts_files_in_place_and_leaves_no_temp_dir():
     with tempfile.TemporaryDirectory() as tmp:
         cm, ckpt, names = _setup(tmp)
         cm.download_checkpoints()
@@ -38,15 +38,15 @@ def test_tai_thanh_cong_file_nam_dung_cho_khong_con_thu_muc_tam():
         assert open(os.path.join(ckpt, "a.ckpt")).read() == "a.ckpt" * 1000
 
 
-def test_ngat_giua_luc_giai_nen_khong_de_lai_file_cut():
+def test_interrupted_extraction_leaves_no_truncated_file():
     with tempfile.TemporaryDirectory() as tmp:
         cm, ckpt, _ = _setup(tmp)
         real = zipfile.ZipFile.extractall
 
         def boom(self, path=None, *a, **k):
-            # giai nen dung 1 file roi "mat dien"
+            # extract exactly 1 file, then "lose power"
             self.extract(self.namelist()[0], path)
-            raise OSError("mat dien giua chung")
+            raise OSError("power lost mid-way")
         zipfile.ZipFile.extractall = boom
         try:
             try:
@@ -55,8 +55,8 @@ def test_ngat_giua_luc_giai_nen_khong_de_lai_file_cut():
                 pass
         finally:
             zipfile.ZipFile.extractall = real
-        assert os.listdir(ckpt) == [], os.listdir(ckpt)  # khong file nao o cho that, khong thu muc tam
-        # lan sau: van thay "chua co" -> tai lai binh thuong
+        assert os.listdir(ckpt) == [], os.listdir(ckpt)  # no file in the real location, no temp directory
+        # next time: still seen as "missing" -> downloads again normally
         cm.download_checkpoints()
         assert all(os.path.exists(p) for p in cm.MODEL_PATHS)
 

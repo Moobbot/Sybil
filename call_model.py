@@ -32,10 +32,11 @@ def download_checkpoints():
     if not os.path.exists(FOLDERS["CHECKPOINT"]) or not all(
         os.path.exists(p) for p in MODEL_PATHS
     ):
-        # P4c: checkpoint gio nam trong named volume (song qua cac lan tao lai
-        # container). Tai + giai nen vao thu muc TAM trong cung volume roi moi
-        # os.replace tung file: bi ngat giua chung thi khong de lai file .ckpt
-        # CUT o cho that (lan sau thay "da co" -> khong tai lai -> nap loi mai).
+        # P4c: checkpoints now live in a named volume (they survive container
+        # re-creation). Download + extract into a TEMP directory in the same volume,
+        # then os.replace each file: an interruption half-way leaves no TRUNCATED
+        # .ckpt in the real location (otherwise the next start sees "present" ->
+        # does not download again -> fails to load forever).
         ckpt_dir = FOLDERS["CHECKPOINT"]
         os.makedirs(ckpt_dir, exist_ok=True)
         tmp_dir = tempfile.mkdtemp(prefix=".download-", dir=ckpt_dir)
@@ -59,9 +60,9 @@ def download_checkpoints():
             shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
-# P4c: nhanh nap nao da chay + dung file trong so nao. routes.py dung de dung
-# dinh danh phien ban (model_info.py). Khong doi chu ky/gia tri tra ve cua
-# load_model (call_model.py goi no o duoi).
+# P4c: which load branch ran + exactly which weight files. routes.py uses it to
+# build the version identity (model_info.py). Does not change the signature/return
+# value of load_model (call_model.py calls it below).
 LOAD_INFO = {"fallback": False, "weight_paths": []}
 
 
@@ -85,10 +86,11 @@ def load_model(model_name="sybil_ensemble"):
         model = Sybil(name_or_path=MODEL_PATHS, calibrator_path=CALIBRATOR_PATH)
         LOAD_INFO.update(fallback=False, weight_paths=[*MODEL_PATHS, CALIBRATOR_PATH])
     except Exception as e:
-        # Truoc day `except:` trong + khong log: nap checkpoint cau hinh loi thi
-        # LANG LE chuyen sang bo trong so khac. Van giu hanh vi do (khong chan
-        # lam sang o P4c) nhung GHI NHAN: phien ban ket qua se mang co `fallback`.
-        print(f"Khong nap duoc checkpoint cau hinh ({type(e).__name__}: {e}) -> dung '{model_name}'")
+        # Previously a bare `except:` with no log: if the configured checkpoint failed
+        # to load, it SILENTLY switched to other weights. That behaviour is kept (P4c
+        # does not block clinical use) but it is RECORDED: result versions carry the
+        # `fallback` flag.
+        print(f"Could not load the configured checkpoint ({type(e).__name__}: {e}) -> using '{model_name}'")
         model = Sybil(model_name)
         LOAD_INFO.update(fallback=True, weight_paths=[])
     print("Model loaded successfully.")
