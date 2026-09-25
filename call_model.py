@@ -1,6 +1,8 @@
 import json
 import os
 import pickle
+import shutil
+import tempfile
 import typing
 import urllib
 import zipfile
@@ -30,15 +32,37 @@ def download_checkpoints():
     if not os.path.exists(FOLDERS["CHECKPOINT"]) or not all(
         os.path.exists(p) for p in MODEL_PATHS
     ):
-        print(f"Downloading checkpoints from {CHECKPOINT_URL}...")
-        zip_path = os.path.join(FOLDERS["CHECKPOINT"], "sybil_checkpoints.zip")
-        urllib.request.urlretrieve(CHECKPOINT_URL, zip_path)
+        # P4c: checkpoint gio nam trong named volume (song qua cac lan tao lai
+        # container). Tai + giai nen vao thu muc TAM trong cung volume roi moi
+        # os.replace tung file: bi ngat giua chung thi khong de lai file .ckpt
+        # CUT o cho that (lan sau thay "da co" -> khong tai lai -> nap loi mai).
+        ckpt_dir = FOLDERS["CHECKPOINT"]
+        os.makedirs(ckpt_dir, exist_ok=True)
+        tmp_dir = tempfile.mkdtemp(prefix=".download-", dir=ckpt_dir)
+        try:
+            print(f"Downloading checkpoints from {CHECKPOINT_URL}...")
+            zip_path = os.path.join(tmp_dir, "sybil_checkpoints.zip")
+            urllib.request.urlretrieve(CHECKPOINT_URL, zip_path)
 
-        print("Extracting checkpoints...")
-        with zipfile.ZipFile(zip_path, "r") as zip_ref:
-            zip_ref.extractall(FOLDERS["CHECKPOINT"])
-        os.remove(zip_path)
-        print("Checkpoints downloaded and extracted successfully.")
+            print("Extracting checkpoints...")
+            extract_dir = os.path.join(tmp_dir, "extract")
+            with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                zip_ref.extractall(extract_dir)
+            for root, _, names in os.walk(extract_dir):
+                for name in names:
+                    src = os.path.join(root, name)
+                    dst = os.path.join(ckpt_dir, os.path.relpath(src, extract_dir))
+                    os.makedirs(os.path.dirname(dst), exist_ok=True)
+                    os.replace(src, dst)
+            print("Checkpoints downloaded and extracted successfully.")
+        finally:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+
+# P4c: nhanh nap nao da chay + dung file trong so nao. routes.py dung de dung
+# dinh danh phien ban (model_info.py). Khong doi chu ky/gia tri tra ve cua
+# load_model (call_model.py goi no o duoi).
+LOAD_INFO = {"fallback": False, "weight_paths": []}
 
 
 def load_model(model_name="sybil_ensemble"):
@@ -59,8 +83,14 @@ def load_model(model_name="sybil_ensemble"):
     print("Loading Sybil model...")
     try:
         model = Sybil(name_or_path=MODEL_PATHS, calibrator_path=CALIBRATOR_PATH)
-    except:
+        LOAD_INFO.update(fallback=False, weight_paths=[*MODEL_PATHS, CALIBRATOR_PATH])
+    except Exception as e:
+        # Truoc day `except:` trong + khong log: nap checkpoint cau hinh loi thi
+        # LANG LE chuyen sang bo trong so khac. Van giu hanh vi do (khong chan
+        # lam sang o P4c) nhung GHI NHAN: phien ban ket qua se mang co `fallback`.
+        print(f"Khong nap duoc checkpoint cau hinh ({type(e).__name__}: {e}) -> dung '{model_name}'")
         model = Sybil(model_name)
+        LOAD_INFO.update(fallback=True, weight_paths=[])
     print("Model loaded successfully.")
     return model
 

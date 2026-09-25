@@ -4,9 +4,10 @@ import uuid
 
 from flask import Blueprint, jsonify, request, send_file, send_from_directory
 
-from call_model import load_model
+from call_model import LOAD_INFO, load_model
 from call_model import predict as _predict_unserialized
 from inference_gate import serialized, start_watchdog, status as inference_status
+from model_info import build_info, source_digest
 from config import FOLDERS, IS_DEV
 from utils import (
     cleanup_old_results,
@@ -23,6 +24,28 @@ from utils import (
 bp = Blueprint("routes", __name__)
 
 model = load_model()
+
+
+def _build_model_info():
+    """P4c: dinh danh DUNG bo trong so + ma suy luan da nap (xem model_info.py).
+
+    Goc digest ma la danh sach TUONG MINH — khong lay ca /app (co volume
+    uploads/, results/ va old_code_sybil/).
+    """
+    base = os.path.dirname(os.path.abspath(__file__))
+    src = source_digest([os.path.join(base, p) for p in ("sybil", "call_model.py", "utils.py", "config.py")])
+    code = f"src.{src[:8]}" if src else "src.unknown"
+    flags = ["fallback"] if LOAD_INFO["fallback"] else []
+    device = str(getattr(model, "device", "")) or None
+    return build_info("sybil", code, LOAD_INFO["weight_paths"], flags, device, fallback=LOAD_INFO["fallback"])
+
+
+try:
+    MODEL_INFO = _build_model_info()
+except Exception as e:  # dinh danh loi KHONG duoc chan service khoi dong
+    print(f"[model_info] khong dung duoc dinh danh phien ban: {e}")
+    MODEL_INFO = {"model": "sybil", "loaded": model is not None, "version": None}
+print(f"[model_info] {MODEL_INFO['version']}")
 
 # Moi lan suy luan chay noi tiep (xem inference_gate.py). Ca 3 route
 # /api_predict, /api_predict_file, /api_predict_zip deu goi qua day.
@@ -42,6 +65,14 @@ def health():
     ok = loaded and not st["stuck"]
     body = {"status": "ok" if ok else "unhealthy", "model_loaded": loaded, **st}
     return jsonify(body), (200 if ok else 503)
+
+
+@bp.route("/info", methods=["GET"])
+def info():
+    """P4c: phien ban mo hinh dang chay. Chi ten file trong so (khong duong dan)."""
+    if model is None:
+        return jsonify({"model": "sybil", "loaded": False, "version": None}), 503
+    return jsonify(MODEL_INFO)
 
 
 @bp.route("/api_predict", methods=["POST"])
@@ -81,6 +112,8 @@ def api_predict():
         "predictions": pred_dict["predictions"],
         "attention_info": attention_info,
         "message": "Prediction successful.",
+        # P4c: phien ban mo hinh da sinh ra DUNG ket qua nay.
+        "model_version": MODEL_INFO["version"],
     }
     if IS_DEV:
         print(f"Response: {response}")
@@ -149,6 +182,8 @@ def api_predict_file():
             f"{base_url}/download_gif/{session_id}" if overlay_files else None
         ),
         "message": "Prediction successful.",
+        # P4c: phien ban mo hinh da sinh ra DUNG ket qua nay.
+        "model_version": MODEL_INFO["version"],
     }
 
     return jsonify(response)
@@ -246,6 +281,8 @@ def api_predict_zip():
         "overlay_images": zip_download_link,
         "attention_info": attention_info,
         "message": "Prediction successful.",
+        # P4c: phien ban mo hinh da sinh ra DUNG ket qua nay.
+        "model_version": MODEL_INFO["version"],
     }
     if IS_DEV:
         print(f"Response: {response}")

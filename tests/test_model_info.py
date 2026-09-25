@@ -1,0 +1,108 @@
+"""P4c — model_info.py: dinh danh phien ban mo hinh.
+
+Chay: cd Sybil && python -m pytest tests/test_model_info.py -q
+(file model_info.py giong het ben CVD-Risk-Estimator — test cung giong).
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+import model_info as mi  # noqa: E402
+
+
+def _write(p, data: bytes):
+    with open(p, "wb") as f:
+        f.write(data)
+    return str(p)
+
+
+def test_digest_khong_phu_thuoc_thu_tu(tmp_path):
+    a = _write(tmp_path / "a.ckpt", b"aaa")
+    b = _write(tmp_path / "b.ckpt", b"bbb")
+    assert mi.weights_digest([a, b]) == mi.weights_digest([b, a])
+
+
+def test_doi_mot_byte_thi_doi_digest(tmp_path):
+    a = _write(tmp_path / "a.ckpt", b"aaa")
+    d1 = mi.weights_digest([a])
+    _write(tmp_path / "a.ckpt", b"aab")
+    assert mi.weights_digest([a]) != d1
+
+
+def test_doi_ten_file_thi_doi_digest(tmp_path):
+    # ten file la mot phan danh tinh (vd iter 700 vs 800) — cung noi dung khac ten van khac
+    a = _write(tmp_path / "x-00700.ptm", b"w")
+    b = _write(tmp_path / "x-00800.ptm", b"w")
+    assert mi.weights_digest([a]) != mi.weights_digest([b])
+
+
+def test_file_thieu_thi_none(tmp_path):
+    a = _write(tmp_path / "a.ckpt", b"aaa")
+    assert mi.weights_digest([a, str(tmp_path / "khong-co.ckpt")]) is None
+    assert mi.weights_digest([]) is None
+
+
+def test_describe_weights_chi_tra_ten_file_khong_tra_duong_dan(tmp_path):
+    a = _write(tmp_path / "a.ckpt", b"aaa")
+    ws = mi.describe_weights([a])
+    assert ws == [{"file": "a.ckpt", "bytes": 3, "sha256": mi.file_sha256(a)}]
+    assert str(tmp_path) not in repr(ws)
+
+
+def test_build_version_day_du_va_co_co():
+    v = mi.build_version("sybil", "src.1a2b3c4d", "0123456789abcdef" * 4, [])
+    assert v == "sybil@src.1a2b3c4d+w.0123456789ab"
+    v2 = mi.build_version("cvd", "tri2dnet-iter700", "f" * 64, ["det.none"])
+    assert v2 == "cvd@tri2dnet-iter700+w.ffffffffffff+det.none"
+
+
+def test_build_version_khong_co_digest_thi_unknown():
+    assert mi.build_version("sybil", "src.x", None, ["fallback"]) == "sybil@src.x+w.unknown+fallback"
+
+
+def test_source_digest_on_dinh_va_bat_thay_doi_ma(tmp_path):
+    pkg = tmp_path / "pkg"
+    pkg.mkdir()
+    _write(pkg / "a.py", b"x = 1\n")
+    _write(pkg / "b.py", b"y = 2\n")
+    _write(pkg / "note.txt", b"khong tinh")
+    d1 = mi.source_digest([str(pkg)])
+    assert d1 == mi.source_digest([str(pkg)])
+    _write(pkg / "note.txt", b"doi file khong phai .py -> khong doi")
+    assert mi.source_digest([str(pkg)]) == d1
+    _write(pkg / "a.py", b"x = 2\n")
+    assert mi.source_digest([str(pkg)]) != d1
+
+
+def test_source_digest_nhan_ca_file_le(tmp_path):
+    f = _write(tmp_path / "call_model.py", b"def f(): pass\n")
+    assert mi.source_digest([f]) is not None
+    assert mi.source_digest([str(tmp_path / "khong-co.py")]) is None
+
+
+def test_build_info_digest_khop_weights_digest_va_khong_duong_dan(tmp_path):
+    a = _write(tmp_path / "a.ckpt", b"aaa")
+    b = _write(tmp_path / "b.json", b"{}")
+    info = mi.build_info("sybil", "src.x", [b, a], [], "cpu")
+    assert info["version"] == mi.build_version("sybil", "src.x", mi.weights_digest([a, b]), [])
+    assert info["contract"] == 1 and info["loaded"] is True
+    assert [w["file"] for w in info["weights"]] == ["a.ckpt", "b.json"]
+    assert str(tmp_path) not in repr(info)
+
+
+def test_build_info_thieu_file_thi_w_unknown(tmp_path):
+    a = _write(tmp_path / "a.ckpt", b"aaa")
+    info = mi.build_info("cvd", "iter700.src.x", [a, str(tmp_path / "mat.pt")], [], "cuda")
+    assert "+w.unknown" in info["version"]
+
+
+def test_source_digest_khong_phu_thuoc_kieu_xuong_dong(tmp_path):
+    # Build tren Windows (autocrlf) va Linux phai ra CUNG src — khong bao "doi ma" gia.
+    a = tmp_path / "a"
+    b = tmp_path / "b"
+    a.mkdir()
+    b.mkdir()
+    _write(a / "m.py", b"x = 1\ny = 2\n")
+    _write(b / "m.py", b"x = 1\r\ny = 2\r\n")
+    assert mi.source_digest([str(a)]) == mi.source_digest([str(b)])
