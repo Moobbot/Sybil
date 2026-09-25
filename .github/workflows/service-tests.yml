@@ -1,0 +1,23 @@
+name: Service tests
+
+# Unit tests of the model-service code added for the diagnosis app (model version,
+# checkpoint download, per-case version). Tests that need torch skip themselves
+# (pytest.importorskip); they run inside the Docker image instead.
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10" # same as the Dockerfile (python:3.10)
+      - run: pip install pytest
+      - run: python -m pytest tests -q
