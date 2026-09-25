@@ -6,7 +6,7 @@ from flask import Blueprint, jsonify, request, send_file, send_from_directory
 
 from call_model import load_model
 from call_model import predict as _predict_unserialized
-from inference_gate import serialized, status as inference_status
+from inference_gate import serialized, start_watchdog, status as inference_status
 from config import FOLDERS, IS_DEV
 from utils import (
     cleanup_old_results,
@@ -27,12 +27,21 @@ model = load_model()
 # Moi lan suy luan chay noi tiep (xem inference_gate.py). Ca 3 route
 # /api_predict, /api_predict_file, /api_predict_zip deu goi qua day.
 predict = serialized(_predict_unserialized)
+start_watchdog()
 
 
 @bp.route("/health", methods=["GET"])
 def health():
-    """Song hay chet, ranh hay ban. Khong cho khoa suy luan."""
-    return jsonify({"status": "ok", "model_loaded": model is not None, **inference_status()})
+    """Song hay chet, ranh hay ban. Khong cho khoa suy luan.
+
+    503 khi model chua nap hoac ca dang chay bi TREO — "co tra loi HTTP" khong
+    co nghia la dung duoc.
+    """
+    st = inference_status()
+    loaded = model is not None
+    ok = loaded and not st["stuck"]
+    body = {"status": "ok" if ok else "unhealthy", "model_loaded": loaded, **st}
+    return jsonify(body), (200 if ok else 503)
 
 
 @bp.route("/api_predict", methods=["POST"])
