@@ -1,26 +1,39 @@
-FROM python:3.10
+# ---- torch-base: keep this stage IDENTICAL in Sybil/Dockerfile and CVD-Risk-Estimator/Dockerfile
+# (dicom-diagnosis/scripts/__tests__/dockerfiles.test.js checks it). Built together
+# (`docker compose build`), or one after the other on the same machine, BuildKit builds it once and
+# both images share its layers: the ~4.9 GB of torch + CUDA libraries is stored once, not twice.
+FROM python:3.10-slim AS torch-base
 
-WORKDIR /app
+# pip otherwise keeps every downloaded wheel in /root/.cache/pip (1.9 GB, never used at run time).
+ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
+# System libraries the Python packages link against (found with ldd on the previous image):
+# OpenCV needs GL, glib, X11 and libatomic. The full python:3.10 image and ffmpeg are not needed
+# (GIFs are written by imageio through Pillow).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgl1 \
+    libglib2.0-0t64 \
+    libgomp1 \
+    libatomic1 \
     libsm6 \
     libxext6 \
     && rm -rf /var/lib/apt/lists/*
 
-# pip otherwise keeps every downloaded wheel in /root/.cache/pip: 1.9 GB of the image
-# (measured), never used at run time. setup.py runs pip in subprocesses, which inherit this.
-ENV PIP_NO_CACHE_DIR=1
-
-# Upgrade pip
 RUN pip install --upgrade pip==24.0
 
-# Copy only requirements first to leverage Docker cache
-COPY requirements.txt setup.py ./
+# The build setup.py used to install (CUDA 12.1 wheels), pinned: 2.5.1 is the last cu121 release.
+# torchaudio is not installed: nothing imports it.
+RUN pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu121
 
-# Install dependencies
-RUN python setup.py
+# ---- Sybil service
+FROM torch-base
+
+WORKDIR /app
+
+# Copy only requirements first to leverage Docker cache
+COPY requirements.txt ./
+
+RUN pip install -r requirements.txt
 
 # Copy the rest of the application
 COPY . .
