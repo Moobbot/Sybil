@@ -12,7 +12,10 @@ class SybilNet(nn.Module):
 
         self.hidden_dim = 512
 
-        encoder = torchvision.models.video.r3d_18(pretrained=True)
+        # No pretrained weights: Sybil's checkpoint replaces every parameter of the encoder
+        # (load_state_dict, strict). `pretrained=True` downloaded torchvision's Kinetics-400 weights
+        # (133 MB) each time a container was created, and without internet the model did not load.
+        encoder = torchvision.models.video.r3d_18(weights=None)
         self.image_encoder = nn.Sequential(*list(encoder.children())[:-2])
 
         self.pool = MultiAttentionPool()
