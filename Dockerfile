@@ -9,6 +9,10 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     && rm -rf /var/lib/apt/lists/*
 
+# pip otherwise keeps every downloaded wheel in /root/.cache/pip: 1.9 GB of the image
+# (measured), never used at run time. setup.py runs pip in subprocesses, which inherit this.
+ENV PIP_NO_CACHE_DIR=1
+
 # Upgrade pip
 RUN pip install --upgrade pip==24.0
 
