@@ -54,9 +54,11 @@ logs/
 uploads/
 results/
 
-# Large files and checkpoints
-# Uncomment if you want to exclude model checkpoints from the Docker image
-# checkpoint/
+# Model weights. docker-compose mounts ./sybil_checkpoints from the host, so after the first start
+# that folder holds the checkpoints (~700 MB): `COPY . .` must not copy them into the image, where
+# the mount would hide them anyway.
+sybil_checkpoints/*
+!sybil_checkpoints/.gitignore
 
 # Debug files
 debug_*.png
